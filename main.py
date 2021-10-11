@@ -4,7 +4,7 @@ Copyright (c) Baoyun Peng, 2021
 '''
 from __future__ import print_function
 
-import argparse
+
 import os
 import shutil
 import time
@@ -17,49 +17,21 @@ import torch.backends.cudnn as cudnn
 import torch.optim as optim
 import torch.utils.data as data
 import torchvision.transforms as transforms
-from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 
 import models
 from dataset.xray_dataset import XrayDataset
 from utils import Logger, AverageMeter, accuracy, mkdir_p, progress_bar
 
-parser = argparse.ArgumentParser(description='Image Classification Training')
-
-# model related, including  Architecture, path, datasets
-parser.add_argument('--arch', type=str, default='resnet50', help='network architecture')
-parser.add_argument('--num-classes', default=14, type=int,
-                    help='the number of classes, default 14')
-parser.add_argument('--dataset', type=str, default='cifar100', help='dataset')
-
-# training hyper-parameters
-parser.add_argument('--train-batch', default=64, type=int, metavar='N',
-                    help='train batchsize')
-parser.add_argument('--test-batch', default=32, type=int, metavar='N',
-                    help='test batchsize')
-parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
-                    metavar='LR', help='initial learning rate')
-parser.add_argument('--schedule', type=int, nargs='+', default=[150, 225],
-                        help='Decrease learning rate at these epochs.')
-parser.add_argument('--gamma', type=float, default=0.1, help='LR is multiplied by gamma on schedule.')
-parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
-                    help='momentum')
-parser.add_argument('--weight-decay', '--wd', default=5e-4, type=float,
-                    metavar='W', help='weight decay (default: 1e-4)')
-
-parser.add_argument('--gpu-id', default='0', type=str,
-                    help='id(s) for CUDA_VISIBLE_DEVICES')
-
+from options import parser
 args = parser.parse_args()
 state = {k: v for k, v in args._get_kwargs()}
 
 
-args.save_path = 'experiments/' + args.dataset + '/' + args.arch + str(args.depth) + '_wd' + str(args.weight_decay) + '_split' + str(args.split_num) 
+args.save_path = 'experiments/' + args.dataset + '/' + args.arch
 if not os.path.isdir(args.save_path):
     os.makedirs(args.save_path)
 
-
-# Use CUDA
 os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id
 use_cuda = torch.cuda.is_available()
 
@@ -75,29 +47,27 @@ best_acc = 0  # best test accuracy
 
 def main():
     global best_acc
-
     if not os.path.isdir(args.checkpoint):
         mkdir_p(args.checkpoint)
 
     # Data
     print('==> Preparing dataset %s' % args.dataset)
-
     transform_train = transforms.Compose([
         transforms.RandomResizedCrop(224),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
-
     transform_test = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
 
-    trainset = XrayDataset(root='./data', train=True, download=True, transform=transform_train)
+    trainset = XrayDataset(root='./data', transform=transform_train)
     trainloader = data.DataLoader(trainset, batch_size=args.train_batch, shuffle=True, num_workers=1)
-    testset = XrayDataset(root='./data', train=False, download=False, transform=transform_test)
+    testset = XrayDataset(root='./data', transform=transform_test)
     testloader = data.DataLoader(testset, batch_size=args.test_batch, shuffle=False, num_workers=1)
+
 
     # Model
     print("==> creating model '{}'".format(args.arch))
@@ -105,12 +75,11 @@ def main():
     model = torch.nn.DataParallel(model).cuda()
     cudnn.benchmark = True
 
-    #-------------------- SETTINGS: LOSS
+    # optimizer and scheduler
     criterion = torch.nn.BCELoss(size_average = True)
-    #-------------------- SETTINGS: OPTIMIZER & SCHEDULER
-    optimizer = optim.Adam (model.parameters(), lr=0.0001, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-5)
-    # scheduler = ReduceLROnPlateau(optimizer, factor = 0.1, patience = 5, mode = 'min')
+    optimizer = optim.Adam(model.parameters(), lr=0.0001, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-4)
 
+    # logger
     title = 'Chest X-ray Image Quality Assessment using ' + args.arch
     logger = Logger(os.path.join(args.save_path, 'log.txt'), title=title)
     logger.set_names(['Learning Rate', 'Train Loss', 'Valid Loss', 'Train Acc.', 'Valid Acc.'])

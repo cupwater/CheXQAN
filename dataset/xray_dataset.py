@@ -1,14 +1,13 @@
 '''
 Author: your name
 Date: 2021-10-10 14:07:51
-LastEditTime: 2021-10-11 13:40:40
+LastEditTime: 2021-10-11 14:41:25
 LastEditors: Please set LastEditors
 Description: In User Settings Edit
 FilePath: /chexnet/dataset/DatasetGenerator.py
 '''
 import os
-from PIL import Image
-
+import cv2
 import torch
 from torch.utils.data import Dataset
 
@@ -18,55 +17,32 @@ class XrayDataset (Dataset):
     
     #-------------------------------------------------------------------------------- 
     
-    def __init__ (self, pathImageDirectory, pathDatasetFile, transform):
+    def __init__ (self, prefix, transform):
     
-        self.listImagePaths = []
-        self.listImageLabels = []
+        self.img_prefix = prefix
+
+        meta_path = os.path.join(prefix, 'meta.txt')
+        image_path = os.path.join(prefix, 'image.txt')
+        with open(meta_path) as fin:
+            lines = fin.readlines()[1:]
+            meta_list = [line.strip().split(',') for line in lines]
+            self.labels = []
+            for meta in meta_list:
+                meta = [int(v) for v in meta]
+                self.labels.append(meta)
+        with open(image_path) as fin:
+            lines = fin.readlines()
+            self.image_list = [line.strip() for line in lines]
+        assert len(self.image_list) == len(self.labels), "image number not match the labels"
+        
         self.transform = transform
     
-        #---- Open file, get image paths and labels
-    
-        fileDescriptor = open(pathDatasetFile, "r")
-        
-        #---- get into the loop
-        line = True
-        
-        while line:
-                
-            line = fileDescriptor.readline()
-            
-            #--- if not empty
-            if line:
-          
-                lineItems = line.split()
-                
-                imagePath = os.path.join(pathImageDirectory, lineItems[0])
-                imageLabel = lineItems[1:]
-                imageLabel = [int(i) for i in imageLabel]
-                
-                self.listImagePaths.append(imagePath)
-                self.listImageLabels.append(imageLabel)   
-            
-        fileDescriptor.close()
-    
-    #-------------------------------------------------------------------------------- 
-    
     def __getitem__(self, index):
-        
-        imagePath = self.listImagePaths[index]
-        
-        imageData = Image.open(imagePath).convert('RGB')
-        imageLabel= torch.FloatTensor(self.listImageLabels[index])
-        
-        if self.transform != None: imageData = self.transform(imageData)
-        
-        return imageData, imageLabel
-        
-    #-------------------------------------------------------------------------------- 
-    
+        img   = cv2.imread(os.path.join(self.prefix, self.image_list[index]))
+        label = torch.FloatTensor(self.labels[index])
+        if self.transform != None: 
+            img = self.transform(img)
+        return img, label
+
     def __len__(self):
-        
-        return len(self.listImagePaths)
-    
- #-------------------------------------------------------------------------------- 
-    
+        return len(self.labels)
