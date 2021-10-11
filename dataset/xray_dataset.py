@@ -8,6 +8,7 @@ FilePath: /chexnet/dataset/DatasetGenerator.py
 '''
 import os
 import cv2
+from PIL import Image
 import torch
 from torch.utils.data import Dataset
 
@@ -17,12 +18,12 @@ class XrayDataset (Dataset):
     
     #-------------------------------------------------------------------------------- 
     
-    def __init__ (self, prefix, transform):
+    def __init__ (self, root, transform, prefix='data/'):
     
-        self.img_prefix = prefix
+        self.prefix = prefix
 
-        meta_path = os.path.join(prefix, 'meta.txt')
-        image_path = os.path.join(prefix, 'image.txt')
+        meta_path = os.path.join(root, 'meta.txt')
+        image_path = os.path.join(root, 'image.txt')
         with open(meta_path) as fin:
             lines = fin.readlines()[1:]
             meta_list = [line.strip().split(',') for line in lines]
@@ -38,10 +39,13 @@ class XrayDataset (Dataset):
         self.transform = transform
     
     def __getitem__(self, index):
-        img   = cv2.imread(os.path.join(self.prefix, self.image_list[index]))
+        img = Image.open(os.path.join(self.prefix, self.image_list[index]))
+        img = img.convert(mode='RGB')
+        #img   = cv2.imread(os.path.join(self.prefix, self.image_list[index]))
+        #img   = cv2.resize(img, (256, 256))
         label = torch.FloatTensor(self.labels[index])
         if self.transform != None: 
-            img = self.transform(img)
+           img = self.transform(img)
         return img, label
 
     def __len__(self):

@@ -13,11 +13,14 @@ parser = argparse.ArgumentParser(description='Image Classification Training')
 
 # model related, including  Architecture, path, datasets
 parser.add_argument('--arch', type=str, default='resnet50', help='network architecture')
-parser.add_argument('--num-classes', default=14, type=int,
+parser.add_argument('--num-classes', default=1, type=int,
                     help='the number of classes, default 14')
 parser.add_argument('--dataset', type=str, default='cifar100', help='dataset')
+parser.add_argument('--prefix', type=str, default='/tmp/znzhang2/medical/', help='image prefix')
 
 # training hyper-parameters
+parser.add_argument('--epoch', default=60, type=int, metavar='N',
+                    help='train epoches')
 parser.add_argument('--train-batch', default=64, type=int, metavar='N',
                     help='train batchsize')
 parser.add_argument('--test-batch', default=32, type=int, metavar='N',

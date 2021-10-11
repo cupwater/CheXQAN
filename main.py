@@ -35,20 +35,12 @@ if not os.path.isdir(args.save_path):
 os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id
 use_cuda = torch.cuda.is_available()
 
-# Random seed
-if args.manualSeed is None:
-    args.manualSeed = random.randint(1, 10000)
-random.seed(args.manualSeed)
-torch.manual_seed(args.manualSeed)
-if use_cuda:
-    torch.cuda.manual_seed_all(args.manualSeed)
-
 best_acc = 0  # best test accuracy
 
 def main():
     global best_acc
-    if not os.path.isdir(args.checkpoint):
-        mkdir_p(args.checkpoint)
+    if not os.path.isdir(args.save_path):
+        mkdir_p(args.save_path)
 
     # Data
     print('==> Preparing dataset %s' % args.dataset)
@@ -63,9 +55,9 @@ def main():
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
 
-    trainset = XrayDataset(root='./data', transform=transform_train)
+    trainset = XrayDataset('./data/train', transform_train, prefix=args.prefix)
     trainloader = data.DataLoader(trainset, batch_size=args.train_batch, shuffle=True, num_workers=1)
-    testset = XrayDataset(root='./data', transform=transform_test)
+    testset = XrayDataset('./data/test', transform_test, prefix=args.prefix)
     testloader = data.DataLoader(testset, batch_size=args.test_batch, shuffle=False, num_workers=1)
 
 
@@ -76,7 +68,7 @@ def main():
     cudnn.benchmark = True
 
     # optimizer and scheduler
-    criterion = torch.nn.BCELoss(size_average = True)
+    criterion = torch.nn.BCEWithLogitsLoss(size_average = True)
     optimizer = optim.Adam(model.parameters(), lr=0.0001, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-4)
 
     # logger
@@ -85,11 +77,11 @@ def main():
     logger.set_names(['Learning Rate', 'Train Loss', 'Valid Loss', 'Train Acc.', 'Valid Acc.'])
 
     # Train and val
-    for epoch in range(200):
+    for epoch in range(args.epoch):
         adjust_learning_rate(optimizer, epoch)
         # scheduler.step(losstensor.data[0])
 
-        print('\nEpoch: [%d | %d] LR: %f' % (epoch + 1, args.epochs, state['lr']))
+        print('\nEpoch: [%d | %d] LR: %f' % (epoch + 1, args.epoch, state['lr']))
         train_loss, train_acc = train(trainloader, model, criterion, optimizer, use_cuda)
         test_loss, test_acc = test(testloader, model, criterion, use_cuda)
         # append logger file
@@ -126,7 +118,7 @@ def train(trainloader, model, criterion, optimizer, use_cuda):
         data_time.update(time.time() - end)
 
         if use_cuda:
-            inputs, targets = inputs.cuda(), targets.cuda(async=True)
+            inputs, targets = inputs.cuda(), targets.cuda()
         inputs, targets = torch.autograd.Variable(inputs), torch.autograd.Variable(targets)
 
         # compute output
@@ -134,10 +126,10 @@ def train(trainloader, model, criterion, optimizer, use_cuda):
         loss = criterion(outputs, targets)
 
         # measure accuracy and record loss
-        prec1, prec5 = accuracy(outputs.data, targets.data, topk=(1, 5))
-        losses.update(loss.data[0], inputs.size(0))
-        top1.update(prec1[0], inputs.size(0))
-        top5.update(prec5[0], inputs.size(0))
+        #prec1, prec5 = accuracy(outputs.data, targets.data, topk=(1))
+        losses.update(loss.item(), inputs.size(0))
+        #top1.update(prec1[0], inputs.size(0))
+        #top5.update(prec5[0], inputs.size(0))
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
@@ -175,12 +167,12 @@ def test(testloader, model, criterion, use_cuda):
         outputs = model(inputs)
         loss = criterion(outputs, targets)
         # measure accuracy and record loss
-        prec1, prec5 = accuracy(outputs.data, targets.data, topk=(1, 5))
+       # prec1, prec5 = accuracy(outputs.data, targets.data, topk=(1, 5))
 
 
-        losses.update(loss.data[0], inputs.size(0))
-        top1.update(prec1[0], inputs.size(0))
-        top5.update(prec5[0], inputs.size(0))
+        losses.update(loss.item(), inputs.size(0))
+        #top1.update(prec1[0], inputs.size(0))
+        #top5.update(prec5[0], inputs.size(0))
 
         progress_bar(batch_idx, len(testloader), 'Loss: %.2f | Top1: %.2f | Top5: %.2f'
                     % (losses.avg, top1.avg, top5.avg))

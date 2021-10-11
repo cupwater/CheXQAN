@@ -3,7 +3,6 @@ import torch.nn as nn
 import os
 import sys
 import math
-from linklink.nn import SyncBatchNorm2d, syncbnVarMode_t
 
 __all__ = ['InceptionV4', 'inceptionv4']
 
@@ -262,19 +261,12 @@ class Inception_C(nn.Module):
 
 class InceptionV4(nn.Module):
 
-    def __init__(self, num_classes=1001, bn_group_size=1, bn_group=None,
-                 bn_var_mode=syncbnVarMode_t.L2, bn_sync_stats=False, use_sync_bn=True):
+    def __init__(self, num_classes=1001):
         super(InceptionV4, self).__init__()
 
         global BN
 
-        def BNFunc(*args, **kwargs):
-            return SyncBatchNorm2d(*args, **kwargs, group=bn_group, sync_stats=bn_sync_stats, var_mode=bn_var_mode)
-
-        if use_sync_bn:
-            BN = BNFunc
-        else:
-            BN = nn.BatchNorm2d
+        BN = nn.BatchNorm2d
 
 
         # Special attributs
@@ -314,7 +306,7 @@ class InceptionV4(nn.Module):
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
                 m.weight.data.normal_(0, math.sqrt(2. / n))
-            elif isinstance(m, SyncBatchNorm2d) or isinstance(m, nn.BatchNorm2d):
+            elif isinstance(m, nn.BatchNorm2d):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 
