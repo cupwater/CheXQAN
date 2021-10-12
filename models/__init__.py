@@ -1,4 +1,5 @@
 from .resnet import *
+from .densenet import *
 from .inception_v3 import *
 from .inception_v4 import *
 from .mobilenet_v2 import *

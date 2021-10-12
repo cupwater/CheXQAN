@@ -51,14 +51,15 @@ def main():
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
     transform_test = transforms.Compose([
+        transforms.CenterCrop(224),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
 
     trainset = XrayDataset('./data/train', transform_train, prefix=args.prefix)
-    trainloader = data.DataLoader(trainset, batch_size=args.train_batch, shuffle=True, num_workers=1)
+    trainloader = data.DataLoader(trainset, batch_size=args.train_batch, shuffle=True, num_workers=5)
     testset = XrayDataset('./data/test', transform_test, prefix=args.prefix)
-    testloader = data.DataLoader(testset, batch_size=args.test_batch, shuffle=False, num_workers=1)
+    testloader = data.DataLoader(testset, batch_size=args.test_batch, shuffle=False, num_workers=5)
 
 
     # Model

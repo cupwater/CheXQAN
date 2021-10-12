@@ -40,6 +40,7 @@ class XrayDataset (Dataset):
     
     def __getitem__(self, index):
         img = Image.open(os.path.join(self.prefix, self.image_list[index]))
+        img = img.resize((256, 256),Image.ANTIALIAS)
         img = img.convert(mode='RGB')
         #img   = cv2.imread(os.path.join(self.prefix, self.image_list[index]))
         #img   = cv2.resize(img, (256, 256))

@@ -15,7 +15,7 @@ parser = argparse.ArgumentParser(description='Image Classification Training')
 parser.add_argument('--arch', type=str, default='resnet50', help='network architecture')
 parser.add_argument('--num-classes', default=1, type=int,
                     help='the number of classes, default 14')
-parser.add_argument('--dataset', type=str, default='cifar100', help='dataset')
+parser.add_argument('--dataset', type=str, default='XrayDataset', help='dataset')
 parser.add_argument('--prefix', type=str, default='/tmp/znzhang2/medical/', help='image prefix')
 
 # training hyper-parameters
