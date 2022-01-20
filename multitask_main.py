@@ -63,7 +63,7 @@ def main():
 
     # Model
     print("==> creating model '{}'".format(args.arch))
-    model = models.__dict__[args.arch](num_classes=args.num_classes)
+    model = models.__dict__[args.arch](num_classes=args.num_classes).cuda()
     # model = torch.nn.DataParallel(model).cuda()
     cudnn.benchmark = True
 
