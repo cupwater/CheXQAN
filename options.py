@@ -1,7 +1,7 @@
 '''
 Author: your name
 Date: 2021-10-11 14:45:50
-LastEditTime: 2021-10-11 14:45:50
+LastEditTime: 2022-01-20 10:43:15
 LastEditors: Please set LastEditors
 Description: In User Settings Edit
 FilePath: /CheXQAN/options.py
@@ -14,7 +14,7 @@ parser = argparse.ArgumentParser(description='Image Classification Training')
 # model related, including  Architecture, path, datasets
 parser.add_argument('--arch', type=str, default='resnet50', help='network architecture')
 parser.add_argument('--num-classes', default=1, type=int,
-                    help='the number of classes, default 14')
+                    help='the number of classes, default 1')
 parser.add_argument('--dataset', type=str, default='XrayDataset', help='dataset')
 parser.add_argument('--prefix', type=str, default='/tmp/znzhang2/medical/', help='image prefix')
 

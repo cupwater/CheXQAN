@@ -3,3 +3,5 @@ data/
 experiments/
 *.sh
 *.out
+checkpoints/
+baks/
