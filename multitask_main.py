@@ -9,6 +9,7 @@ import os
 import shutil
 import time
 import random
+import pdb
 
 import torch
 import torch.nn as nn
@@ -120,15 +121,17 @@ def train(trainloader, model, criterion, optimizer, use_cuda):
         if use_cuda:
             inputs, targets = inputs.cuda(), targets.cuda()
         inputs, targets = torch.autograd.Variable(inputs), torch.autograd.Variable(targets)
-        # compute output
         outputs = model(inputs)
-        loss = criterion(outputs.view(outputs.size(0), -1), targets.view(targets.size(0), -1))
 
-        # measure accuracy and record loss
-        #prec1, prec5 = accuracy(outputs.data, targets.data, topk=(1))
+        outputs = outputs.view(outputs.size(0), -1)
+        outputs = torch.sigmoid(outputs)
+        targets = targets.view(targets.size(0), -1)
+
+        loss = criterion(outputs, targets)
+        predict = outputs > 0
+        predict_res = (predict == targets)
         losses.update(loss.item(), inputs.size(0))
-        #top1.update(prec1[0], inputs.size(0))
-        #top5.update(prec5[0], inputs.size(0))
+        top1.update(torch.sum(predict_res.long()), predict_res.size(0))
         # compute gradient and do SGD step
         optimizer.zero_grad()
         loss.backward()
