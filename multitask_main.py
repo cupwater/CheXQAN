@@ -23,22 +23,20 @@ import torchvision.transforms as transforms
 import models
 from dataset.multitask_dataset import MultiTaskDataset
 from utils import Logger, AverageMeter, accuracy, mkdir_p, progress_bar
-
 from options import parser
-args = parser.parse_args()
-state = {k: v for k, v in args._get_kwargs()}
 
-
-args.save_path = 'experiments/' + args.dataset + '/' + args.arch
-if not os.path.isdir(args.save_path):
-    os.makedirs(args.save_path)
-
-os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id
-use_cuda = torch.cuda.is_available()
 
 best_acc = 0  # best test accuracy
 
 def main():
+    args = parser.parse_args()
+    state = {k: v for k, v in args._get_kwargs()}
+    args.save_path = 'experiments/' + args.dataset + '/' + args.arch
+    if not os.path.isdir(args.save_path):
+        os.makedirs(args.save_path)
+
+    os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id
+    use_cuda = torch.cuda.is_available()
     global best_acc
     if not os.path.isdir(args.save_path):
         mkdir_p(args.save_path)
@@ -58,7 +56,6 @@ def main():
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
-
     trainset = MultiTaskDataset(args.train_list, args.train_meta, transform_train, prefix=args.prefix)
     trainloader = data.DataLoader(trainset, batch_size=args.train_batch, shuffle=True, num_workers=5)
     testset = MultiTaskDataset(args.test_list, args.test_meta, transform_test, prefix=args.prefix)
@@ -67,7 +64,7 @@ def main():
     # Model
     print("==> creating model '{}'".format(args.arch))
     model = models.__dict__[args.arch](num_classes=args.num_classes)
-    model.load_state_dict(torch.load(args.pretrained_weights)['state_dict'])
+    model.load_state_dict(torch.load(args.pretrained_weights)['state_dict'], strict=False)
     # model = model.cuda()
     cudnn.benchmark = True
 
@@ -82,7 +79,7 @@ def main():
 
     # Train and val
     for epoch in range(args.epoch):
-        adjust_learning_rate(optimizer, epoch)
+        adjust_learning_rate(optimizer, epoch, args)
         # scheduler.step(losstensor.data[0])
 
         print('\nEpoch: [%d | %d] LR: %f' % (epoch + 1, args.epoch, state['lr']))
@@ -191,7 +188,7 @@ def save_checkpoint(state, is_best, save_path='experiment/template', filename='c
     if is_best:
         shutil.copyfile(filepath, os.path.join(save_path, 'model_best.pth.tar'))
 
-def adjust_learning_rate(optimizer, epoch):
+def adjust_learning_rate(optimizer, epoch, args):
     global state
     if epoch in args.schedule:
         state['lr'] *= args.gamma

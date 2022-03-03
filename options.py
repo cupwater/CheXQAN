@@ -1,7 +1,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-01-20 10:43:15
-LastEditTime: 2022-03-03 21:58:32
+LastEditTime: 2022-03-03 23:10:01
 Description: 
 
 '''
@@ -16,8 +16,10 @@ parser.add_argument('--num-classes', default=1, type=int,
                     help='the number of classes, default 1')
 
 parser.add_argument('--dataset', type=str, default='XrayDataset', help='dataset')
-parser.add_argument('--prefix', type=str, default='/tmp/znzhang2/medical/', help='image prefix')
 
+parser.add_argument('--pretrained-weights', type=str, default='checkpoints/pretrained_densenet121.pth.tar', help='pretrained weights')
+
+parser.add_argument('--prefix', type=str, default='data/', help='image prefix')
 parser.add_argument('--train-list', type=str, default='train_list.txt', help='train image list')
 parser.add_argument('--train-meta', type=str, default='train_meta.txt', help='train meta list')
 parser.add_argument('--test-list', type=str, default='test_list.txt', help='test image list')
