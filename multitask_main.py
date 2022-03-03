@@ -59,20 +59,21 @@ def main():
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
 
-    trainset = MultiTaskDataset('./data/content.json', transform_train, prefix=args.prefix)
+    trainset = MultiTaskDataset(args.train_list, args.train_meta, transform_train, prefix=args.prefix)
     trainloader = data.DataLoader(trainset, batch_size=args.train_batch, shuffle=True, num_workers=5)
-    testset = MultiTaskDataset('./data/content.json', transform_test, prefix=args.prefix)
+    testset = MultiTaskDataset(args.test_list, args.test_meta, transform_test, prefix=args.prefix)
     testloader = data.DataLoader(testset, batch_size=args.test_batch, shuffle=False, num_workers=5)
 
     # Model
     print("==> creating model '{}'".format(args.arch))
-    model = models.__dict__[args.arch](num_classes=args.num_classes).cuda()
-    # model = torch.nn.DataParallel(model).cuda()
+    model = models.__dict__[args.arch](num_classes=args.num_classes)
+    model.load_state_dict(torch.load(args.pretrained_weights)['state_dict'])
+    # model = model.cuda()
     cudnn.benchmark = True
 
     # optimizer and scheduler
     criterion = torch.nn.BCEWithLogitsLoss(size_average = True)
-    optimizer = optim.Adam(model.parameters(), lr=0.0001, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-4)
+    optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=args.weight_decay)
 
     # logger
     title = 'Chest X-ray Image Quality Assessment using ' + args.arch

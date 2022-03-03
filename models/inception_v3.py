@@ -27,7 +27,7 @@ def inceptionv3(**kwargs):
     #    model.load_state_dict(model_zoo.load_url(model_urls['inception_v3_google']))
     #    return model
 
-    return Inception3(**kwargs, aux_logits=False)
+    return Inception3(aux_logits=False, **kwargs)
 
 
 class Inception3(nn.Module):

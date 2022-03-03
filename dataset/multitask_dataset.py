@@ -1,7 +1,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-02-23 15:42:01
-LastEditTime: 2022-03-03 21:23:13
+LastEditTime: 2022-03-03 21:29:09
 Description: 
 
 '''
@@ -14,13 +14,13 @@ class MultiTaskDataset (Dataset):
     
     #-------------------------------------------------------------------------------- 
     
-    def __init__ (self, img_list, meta_file, transform, prefix='data/'):
+    def __init__ (self, img_list, meta, transform, prefix='data/'):
     
         self.prefix = prefix
         # read imgs_list and metas
         imgs_list = open(img_list).readlines()
         self.imgs_list = [l.strip() for l in img_list]
-        metas = open(meta_file).readlines()[1:]
+        metas = open(meta).readlines()[1:]
         self.metas = [ [int(i) for i in v.strip().split(' ')]  for v in metas]
         self.transform = transform
     
