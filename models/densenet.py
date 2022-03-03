@@ -165,3 +165,13 @@ class DenseNet(nn.Module):
         out = F.avg_pool2d(out, kernel_size=7, stride=1).view(features.size(0), -1)
         out = self.classifier(out)
         return out
+
+
+if __name__ == "__main__":
+    model = densenet121(pretrained=False)
+    weights = torch.load('../checkpoints/pretrained_densenet121.pth.tar')['state_dict']
+    
+    import pdb
+    pdb.set_trace()
+
+    model.load_state_dict(weights, strict=False)

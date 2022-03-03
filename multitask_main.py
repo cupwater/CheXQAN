@@ -46,12 +46,14 @@ def main():
     # Data
     print('==> Preparing dataset %s' % args.dataset)
     transform_train = transforms.Compose([
-        transforms.RandomResizedCrop(224),
+        transforms.Resize(256),
+        transforms.RandomCrop(224),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
     transform_test = transforms.Compose([
+        transforms.Resize(256),
         transforms.CenterCrop(224),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
@@ -169,7 +171,6 @@ def test(testloader, model, criterion, use_cuda):
         loss = criterion(outputs.view(outputs.size(0), -1), targets.view(targets.size(0), -1))
         # measure accuracy and record loss
        # prec1, prec5 = accuracy(outputs.data, targets.data, topk=(1, 5))
-
 
         losses.update(loss.item(), inputs.size(0))
         #top1.update(prec1[0], inputs.size(0))

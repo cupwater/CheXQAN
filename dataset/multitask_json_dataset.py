@@ -1,28 +1,29 @@
 '''
-Author: your name
-Date: 2022-02-18 14:22:07
-LastEditTime: 2022-02-19 10:19:40
-LastEditors: Please set LastEditors
-Description: 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
-FilePath: /CheXQAN/dataset/simgletask_dataset.py
+Author: Baoyun Peng
+Date: 2022-01-20 11:10:49
+LastEditTime: 2022-03-03 21:19:20
+Description: 
+
 '''
 import os
 from PIL import Image
 import torch
 from torch.utils.data import Dataset
 
-class SingleTaskDataset (Dataset):
+import json
+#-------------------------------------------------------------------------------- 
+
+class MultiTaskJSONDataset (Dataset):
     
     #-------------------------------------------------------------------------------- 
     
-    def __init__ (self, img_list, meta_file, transform, prefix='data/'):
+    def __init__ (self, meta_file, transform, prefix='data/'):
     
         self.prefix = prefix
-        # read imgs_list and metas
-        imgs_list = open(img_list).readlines()
-        self.imgs_list = [l.strip() for l in img_list]
-        metas = open(meta_file).readlines()[1:]
-        self.metas = [int(v) for v in metas]
+        with open(meta_file) as fin:
+            self.meta = json.load(fin)
+            self.imglist = list(self.meta.keys())
+
         self.transform = transform
     
     def __getitem__(self, index):
@@ -43,4 +44,4 @@ class SingleTaskDataset (Dataset):
         return img, labels
 
     def __len__(self):
-        return len(self.imgs_list)
+        return len(self.imglist)

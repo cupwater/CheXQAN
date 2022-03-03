@@ -5,3 +5,4 @@ experiments/
 *.out
 checkpoints/
 baks/
+.DS_Store
