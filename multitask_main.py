@@ -25,10 +25,12 @@ from dataset.multitask_dataset import MultiTaskDataset
 from utils import Logger, AverageMeter, accuracy, mkdir_p, progress_bar
 from options import parser
 
-
+state = {}
 best_acc = 0  # best test accuracy
 
+
 def main():
+    global state
     args = parser.parse_args()
     state = {k: v for k, v in args._get_kwargs()}
     args.save_path = 'experiments/' + args.dataset + '/' + args.arch
@@ -44,14 +46,14 @@ def main():
     # Data
     print('==> Preparing dataset %s' % args.dataset)
     transform_train = transforms.Compose([
-        transforms.Resize(256),
+        transforms.Resize(224),
         transforms.RandomCrop(224),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
     transform_test = transforms.Compose([
-        transforms.Resize(256),
+        transforms.Resize(224),
         transforms.CenterCrop(224),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
@@ -64,13 +66,21 @@ def main():
     # Model
     print("==> creating model '{}'".format(args.arch))
     model = models.__dict__[args.arch](num_classes=args.num_classes)
+    model.classifier = nn.Sequential(
+        nn.Linear(model.classifier.in_features, args.num_classes), nn.Sigmoid())
     model.load_state_dict(torch.load(args.pretrained_weights)['state_dict'], strict=False)
-    # model = model.cuda()
+    model = model.cuda()
     cudnn.benchmark = True
 
     # optimizer and scheduler
-    criterion = torch.nn.BCEWithLogitsLoss(size_average = True)
-    optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=args.weight_decay)
+    criterion = torch.nn.BCELoss()
+    optimizer = optim.SGD(
+        filter(
+            lambda p: p.requires_grad,
+            model.parameters()),
+        lr=args.lr,
+        momentum=0.9,
+        weight_decay=args.weight_decay)
 
     # logger
     title = 'Chest X-ray Image Quality Assessment using ' + args.arch
@@ -124,14 +134,13 @@ def train(trainloader, model, criterion, optimizer, use_cuda):
         outputs = model(inputs)
 
         outputs = outputs.view(outputs.size(0), -1)
-        outputs = torch.sigmoid(outputs)
         targets = targets.view(targets.size(0), -1)
 
         loss = criterion(outputs, targets)
-        predict = outputs > 0
+        predict = outputs > 0.5
         predict_res = (predict == targets)
         losses.update(loss.item(), inputs.size(0))
-        top1.update(torch.sum(predict_res.long()), predict_res.size(0))
+        top1.update(torch.sum(predict_res.long())/inputs.size(0), predict_res.size(0))
         # compute gradient and do SGD step
         optimizer.zero_grad()
         loss.backward()
@@ -166,16 +175,18 @@ def test(testloader, model, criterion, use_cuda):
         inputs, targets = torch.autograd.Variable(inputs, volatile=True), torch.autograd.Variable(targets)
         # compute output
         outputs = model(inputs)
-        loss = criterion(outputs.view(outputs.size(0), -1), targets.view(targets.size(0), -1))
-        # measure accuracy and record loss
-       # prec1, prec5 = accuracy(outputs.data, targets.data, topk=(1, 5))
+        outputs = outputs.view(outputs.size(0), -1)
+        targets = targets.view(targets.size(0), -1)
 
+        loss = criterion(outputs, targets)
+        predict = outputs > 0.5
+        predict_res = (predict == targets)
         losses.update(loss.item(), inputs.size(0))
-        #top1.update(prec1[0], inputs.size(0))
-        #top5.update(prec5[0], inputs.size(0))
+        
+        top1.update(torch.sum(predict_res.long())/inputs.size(0), predict_res.size(0))
 
-        progress_bar(batch_idx, len(testloader), 'Loss: %.2f | Top1: %.2f | Top5: %.2f'
-                    % (losses.avg, top1.avg, top5.avg))
+        progress_bar(batch_idx, len(testloader), 'Loss: %.2f | Top1: %.2f'
+                    % (losses.avg, top1.avg))
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
