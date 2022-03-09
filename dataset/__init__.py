@@ -9,4 +9,4 @@ FilePath: /chexnet/dataset/__init__.py
 
 from .multitask_dataset import *
 from .multitask_inmemory_dataset import *
-from multitask_json_dataset import *
+from .multitask_json_dataset import *

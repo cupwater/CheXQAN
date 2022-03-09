@@ -36,7 +36,7 @@ class MultiTaskInMemoryDataset (Dataset):
     
     def __readAllData__(self):
         img_data_lists = []
-        for index in len(self.imgs_list):
+        for index in range(len(self.imgs_list)):
             img_path = os.path.join(self.prefix, self.imgs_list[index].strip())
             img = cv2.imread(img_path)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)

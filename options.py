@@ -38,7 +38,7 @@ parser.add_argument('--epoch', default=60, type=int, metavar='N',
                     help='train epoches')
 parser.add_argument('--train-batch', default=64, type=int, metavar='N',
                     help='train batchsize')
-parser.add_argument('--test-batch', default=32, type=int, metavar='N',
+parser.add_argument('--test-batch', default=8, type=int, metavar='N',
                     help='test batchsize')
 parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
                     metavar='LR', help='initial learning rate')
