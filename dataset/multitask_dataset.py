@@ -1,12 +1,12 @@
 '''
 Author: Baoyun Peng
 Date: 2022-02-23 15:42:01
-LastEditTime: 2022-03-03 23:07:25
+LastEditTime: 2022-03-05 13:28:44
 Description: 
 
 '''
 import os
-from PIL import Image
+import cv2
 import torch
 from torch.utils.data import Dataset
 
@@ -26,12 +26,14 @@ class MultiTaskDataset (Dataset):
     
     def __getitem__(self, index):
         img_path = os.path.join(self.prefix, self.imgs_list[index].strip())
-        img = Image.open(img_path)
-        img = img.convert(mode='RGB')
+        img = cv2.imread(img_path)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        if self.transform != None:
+           img = self.transform(image=img)['image']
+        img = img.transpose((2,0,1))
         labels = self.metas[index]
         labels = torch.FloatTensor(labels)
-        if self.transform != None: 
-           img = self.transform(img)
+        img = torch.FloatTensor(img)
         return img, labels
 
     def __len__(self):

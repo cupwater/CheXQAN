@@ -8,8 +8,6 @@ from __future__ import print_function
 import os
 import shutil
 import time
-import random
-import pdb
 
 import torch
 import torch.nn as nn
@@ -18,16 +16,16 @@ import torch.backends.cudnn as cudnn
 import torch.optim as optim
 import torch.utils.data as data
 import torchvision.transforms as transforms
+from augmentation.medical_augment import XrayTrainTransform, XrayTestTransform
 
 
 import models
 from dataset.multitask_dataset import MultiTaskDataset
-from utils import Logger, AverageMeter, accuracy, mkdir_p, progress_bar
+from utils import Logger, AverageMeter, mkdir_p, progress_bar
 from options import parser
 
 state = {}
 best_acc = 0  # best test accuracy
-
 
 def main():
     global state
@@ -45,19 +43,9 @@ def main():
 
     # Data
     print('==> Preparing dataset %s' % args.dataset)
-    transform_train = transforms.Compose([
-        transforms.Resize(224),
-        transforms.RandomCrop(224),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-    ])
-    transform_test = transforms.Compose([
-        transforms.Resize(224),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-    ])
+    transform_train = XrayTrainTransform()
+    transform_test = XrayTestTransform()
+    
     trainset = MultiTaskDataset(args.train_list, args.train_meta, transform_train, prefix=args.prefix)
     trainloader = data.DataLoader(trainset, batch_size=args.train_batch, shuffle=True, num_workers=5)
     testset = MultiTaskDataset(args.test_list, args.test_meta, transform_test, prefix=args.prefix)
@@ -140,7 +128,7 @@ def train(trainloader, model, criterion, optimizer, use_cuda):
         predict = outputs > 0.5
         predict_res = (predict == targets)
         losses.update(loss.item(), inputs.size(0))
-        top1.update(torch.sum(predict_res.long())/inputs.size(0), predict_res.size(0))
+        top1.update(torch.sum(predict_res.long())/(inputs.size(0)*targets.size(1)), predict_res.size(0))
         # compute gradient and do SGD step
         optimizer.zero_grad()
         loss.backward()
@@ -156,15 +144,14 @@ def train(trainloader, model, criterion, optimizer, use_cuda):
 
 def test(testloader, model, criterion, use_cuda):
     global best_acc
+    # switch to evaluate mode
+    model.eval()
 
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
     top1 = AverageMeter()
-    top5 = AverageMeter()
-
-    # switch to evaluate mode
-    model.eval()
+    
     end = time.time()
     for batch_idx, (inputs, targets) in enumerate(testloader):
         # measure data loading time
@@ -183,7 +170,7 @@ def test(testloader, model, criterion, use_cuda):
         predict_res = (predict == targets)
         losses.update(loss.item(), inputs.size(0))
         
-        top1.update(torch.sum(predict_res.long())/inputs.size(0), predict_res.size(0))
+        top1.update(torch.sum(predict_res.long())/(inputs.size(0)*targets.size(1)), predict_res.size(0))
 
         progress_bar(batch_idx, len(testloader), 'Loss: %.2f | Top1: %.2f'
                     % (losses.avg, top1.avg))
