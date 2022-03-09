@@ -13,7 +13,7 @@ from collections import OrderedDict
 
 BN = None
 
-__all__ = ['DenseNet', 'densenet121', 'densenet169', 'densenet201', 'densenet161']
+__all__ = ['densenet121_512', 'densenet169_512', 'densenet201_512', 'densenet161_512']
 
 
 model_urls = {
@@ -176,7 +176,7 @@ class DenseNet(nn.Module):
     def forward(self, x):
         features = self.features(x)
         features = self.conv1(features)
-        out = F.adaptive_avg_pool2d(features).view(features.size(0), -1)
+        out = F.adaptive_avg_pool2d(features, output_size=1).view(features.size(0), -1)
         out = self.classifier(out)
         return out
 
