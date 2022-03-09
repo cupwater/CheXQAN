@@ -20,7 +20,8 @@ from augmentation.medical_augment import XrayTrainTransform, XrayTestTransform
 
 
 import models
-from dataset.multitask_dataset import MultiTaskDataset
+import dataset
+# from dataset.multitask_dataset import MultiTaskDataset
 from utils import Logger, AverageMeter, mkdir_p, progress_bar
 from options import parser
 
@@ -46,9 +47,9 @@ def main():
     transform_train = XrayTrainTransform()
     transform_test = XrayTestTransform()
     
-    trainset = MultiTaskDataset(args.train_list, args.train_meta, transform_train, prefix=args.prefix)
+    trainset = dataset.__dict__[args.dataset](args.train_list, args.train_meta, transform_train, prefix=args.prefix)
     trainloader = data.DataLoader(trainset, batch_size=args.train_batch, shuffle=True, num_workers=5)
-    testset = MultiTaskDataset(args.test_list, args.test_meta, transform_test, prefix=args.prefix)
+    testset = dataset.__dict__[args.dataset](args.test_list, args.test_meta, transform_test, prefix=args.prefix)
     testloader = data.DataLoader(testset, batch_size=args.test_batch, shuffle=False, num_workers=5)
 
     # Model
@@ -57,7 +58,8 @@ def main():
     model.classifier = nn.Sequential(
         nn.Linear(model.classifier.in_features, args.num_classes), nn.Sigmoid())
     model.load_state_dict(torch.load(args.pretrained_weights)['state_dict'], strict=False)
-    model = model.cuda()
+    if use_cuda:
+        model = model.cuda()
     cudnn.benchmark = True
 
     # optimizer and scheduler

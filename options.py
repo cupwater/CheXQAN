@@ -1,7 +1,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-01-20 10:43:15
-LastEditTime: 2022-03-03 23:10:01
+LastEditTime: 2022-03-09 16:28:09
 Description: 
 
 '''
@@ -15,7 +15,7 @@ parser.add_argument('--arch', type=str, default='densenet121', help='network arc
 parser.add_argument('--num-classes', default=1, type=int,
                     help='the number of classes, default 1')
 
-parser.add_argument('--dataset', type=str, default='XrayDataset', help='dataset')
+parser.add_argument('--dataset', type=str, default='MultiTaskDataset', help='dataset')
 
 parser.add_argument('--pretrained-weights', type=str, default='checkpoints/pretrained_densenet121.pth.tar', help='pretrained weights')
 parser.add_argument('--save-path', type=str, default='experiments/template', help='save path')

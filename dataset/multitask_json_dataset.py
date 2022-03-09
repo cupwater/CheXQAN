@@ -1,7 +1,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-01-20 11:10:49
-LastEditTime: 2022-03-03 21:19:20
+LastEditTime: 2022-03-09 16:22:58
 Description: 
 
 '''
@@ -12,6 +12,8 @@ from torch.utils.data import Dataset
 
 import json
 #-------------------------------------------------------------------------------- 
+
+__all__ = ['MultiTaskJSONDataset']
 
 class MultiTaskJSONDataset (Dataset):
     
