@@ -1,7 +1,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-03-04 23:49:14
-LastEditTime: 2022-03-08 09:05:25
+LastEditTime: 2022-03-10 10:48:32
 Description: 
 
 '''
@@ -22,6 +22,13 @@ def XrayTestTransform(img_size=256, crop_size=224):
         A.Resize(img_size, img_size),
         A.CenterCrop(width=crop_size, height=crop_size),
         A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
+    ])
+
+def SegmentTransform(img_size=512, crop_size=512):
+    return A.Compose([
+        A.Resize(img_size, img_size),
+        A.Normalize(mean=(0.5, 0.5, 0.5)),
+        A.ToTensor()
     ])
 
 if __name__ == "__main__":
