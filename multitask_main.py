@@ -44,8 +44,8 @@ def main():
 
     # Data
     print('==> Preparing dataset %s' % args.dataset)
-    transform_train = XrayTrainTransform()
-    transform_test = XrayTestTransform()
+    transform_train = XrayTrainTransform(crop_size=args.crop_size, img_size=args.img_size)
+    transform_test = XrayTestTransform(crop_size=args.crop_size, img_size=args.img_size)
     
     trainset = dataset.__dict__[args.dataset](args.train_list, args.train_meta, transform_train, prefix=args.prefix)
     trainloader = data.DataLoader(trainset, batch_size=args.train_batch, shuffle=True, num_workers=5)
