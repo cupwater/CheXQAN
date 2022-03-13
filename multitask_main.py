@@ -32,7 +32,7 @@ def main():
     global state
     args = parser.parse_args()
     state = {k: v for k, v in args._get_kwargs()}
-    args.save_path = 'experiments/' + args.dataset + '/' + args.arch
+    #args.save_path = 'experiments/' + args.dataset + '/' + args.arch
     if not os.path.isdir(args.save_path):
         os.makedirs(args.save_path)
 

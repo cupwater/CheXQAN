@@ -121,8 +121,8 @@ def he(img):
     return outImg.astype(np.uint8)
 
 def main():
-    in_prefix  = ''
-    out_prefix = ''
+    in_prefix  = '/home/znzhang2/datasets/medical/Shukang/ChestXRay-histImages'
+    out_prefix = '/home/znzhang2/datasets/medical/Shukang/ChestXRay-histImagesReverse'
     # import matplotlib.pyplot as plt
     imglist = sys.argv[1]
     import os
@@ -131,6 +131,7 @@ def main():
             img_name = os.path.join(in_prefix, line.strip())
             img = imageio.imread(img_name)
             img = cv2.resize(img, (512, 512))
+            img = 1.0 - img
             result = he(img)
             imageio.imwrite(os.path.join(out_prefix, line.strip()), result)
 
