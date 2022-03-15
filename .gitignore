@@ -7,4 +7,6 @@ experiments/
 checkpoints/
 baks/
 .DS_Store
+*.txt
 *.pyc
+configs/
