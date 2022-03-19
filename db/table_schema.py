@@ -1,7 +1,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-03-14 13:24:07
-LastEditTime: 2022-03-14 13:41:31
+LastEditTime: 2022-03-19 13:38:49
 Description: 
 
 '''
@@ -18,10 +18,10 @@ ai_model_center = {
     'inspection_project': '',
     'model_introduction': '',
     'state': '',
-    # 'create_time': '',
-    # 'update_time': '',
-    # 'update_user': '',
-    # 'is_delete': ''
+    'create_time': '',
+    'update_time': '',
+    'update_user': '',
+    'is_delete': ''
 }
 
 ai_model_data_center = {
@@ -36,11 +36,11 @@ ai_model_data_center = {
     'template_id': '',
     'ai_score': '',
     'ai_score_level': '',
-    'state': '',
-    # 'create_time': '',
-    # 'update_time': '',
-    # 'update_user': '',
-    # 'is_delete': ''
+    'state': '',    
+    'create_time': '',
+    'update_time': '',
+    'update_user': '',
+    'is_delete': ''
 }
 
 ai_model_finish_template_info={
@@ -56,10 +56,10 @@ ai_model_finish_template_info={
     'title': '',
     'content': '',
     'score': '',
-    # 'create_time': '',
-    # 'update_time': '',
-    # 'update_user': '',
-    # 'is_delete': ''
+    'create_time': '',
+    'update_time': '',
+    'update_user': '',
+    'is_delete': ''
 }
 
 ai_model_template_module_info={
@@ -69,8 +69,8 @@ ai_model_template_module_info={
     'title': '',
     'content': '',
     'score': '',
-    # 'create_time': '',
-    # 'update_time': '',
-    # 'update_user': '',
-    # 'is_delete': ''
+    'create_time': '',
+    'update_time': '',
+    'update_user': '',
+    'is_delete': ''
 }

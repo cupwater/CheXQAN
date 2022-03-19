@@ -3,7 +3,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-03-13 23:37:14
-LastEditTime: 2022-03-15 11:20:29
+LastEditTime: 2022-03-19 14:49:18
 Description: CRUD functions for MySQL
  reference: https://www.cnblogs.com/xuanzhi201111/p/5144982.html
 
@@ -37,18 +37,18 @@ def get_connect(user, passwd, db, host='127.0.0.1', port=3306, charset='utf8'):
     cursor = conn.cursor()
     return conn, cursor
 
-
 def close_connect(conn, cursor):
     cursor.close()
     conn.close()
 
-
-def db_execute(conn, cursor, sql, val):
-    cursor.execute(sql, val)
+def db_execute_val(conn, cursor, sql, val=None):
+    if val is not None:
+        cursor.execute(sql)
+    else:
+        cursor.execute(sql, val)
     conn.commit()
-    # print(cursor.rowcount, "record inserted.")
 
-def get_insert_sql(table_name, table_schema_dict):
+def gen_insert_sql(table_name, table_schema_dict):
     _sql = f"INSERT INTO {table_name} ("
     _posix = ""
     for key, _ in table_schema_dict.items():
@@ -58,10 +58,27 @@ def get_insert_sql(table_name, table_schema_dict):
     _posix = _posix + ")"
     return _sql + _posix
 
-def get_update_sql(table_name, table_schema_dict):
-    _sql = ""
+def gen_delete_sql(table_name, conditions=None):
+    if conditions is None:
+        _sql = f"DELETE FROM {table_name} "
+    else:
+        _sql = f"DELETE FROM {table_name} WHERE {conditions}"
     return _sql
 
-def get_items_val():
+def gen_select_sql(table_name, query_conds=None):
+    if query_conds is None:
+        _sql = f"SELECT * FROM {table_name}"
+    else:
+        # select those data satisfying the query conditions
+        _sql = f"SELECT * FROM {table_name} where {query_conds}"
+    return _sql
+
+def gen_items_val():
     items = []
     return items
+
+
+if __name__ == "__main__":
+    select_sql = gen_select_sql('ai_model_data_center')
+    import pdb
+    pdb.set_trace()
