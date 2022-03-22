@@ -10,3 +10,4 @@ baks/
 *.txt
 *.pyc
 configs/
+.VSCodeCounter/
