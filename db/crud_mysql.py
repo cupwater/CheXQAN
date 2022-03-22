@@ -3,13 +3,13 @@
 '''
 Author: Baoyun Peng
 Date: 2022-03-13 23:37:14
-LastEditTime: 2022-03-22 13:39:32
+LastEditTime: 2022-03-22 20:08:57
 Description: CRUD functions for MySQL
  reference: https://www.cnblogs.com/xuanzhi201111/p/5144982.html
 
 '''
 import MySQLdb
-from table_schema import ai_model_center, ai_model_data_center, ai_model_finish_template_info, ai_model_template_module_info
+from .table_schema import ai_model_center, ai_model_data_center, ai_model_finish_template_info, ai_model_template_module_info
 
 # insert_sql = "INSERT INTO ai_model_center ( \
 #     id, \
@@ -57,14 +57,17 @@ def db_execute_val(conn, cursor, sql, val=None):
         result = None
     return result
 
-def gen_insert_sql(table_name, table_schema_dict):
+def gen_insert_sql(table_name, table_schema):
     _sql = f"INSERT INTO {table_name} ("
     _posix = ""
-    for key in table_schema_dict:
-        _sql += key + ', '
-        _posix += "%s, "
-    _sql = _sql + ") VALUES ("
-    _posix = _posix + ")"
+    for key in table_schema:
+        _sql += key + ','
+        if 'time' in key: 
+            _posix += "'%s',"
+        else:
+             _posix += "%s,"
+    _sql = _sql.strip(',') + ") VALUES ("
+    _posix = _posix.strip(',') + ")"
     return _sql + _posix
 
 def gen_delete_sql(table_name, conditions=None):

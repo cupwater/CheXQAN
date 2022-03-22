@@ -1,12 +1,12 @@
 '''
 Author: Baoyun Peng
 Date: 2022-03-14 13:24:07
-LastEditTime: 2022-03-20 19:45:16
+LastEditTime: 2022-03-22 20:02:30
 Description: 
 
 '''
 
-ai_model_center = (
+ai_model_center = [
     'id',
     'service_type',
     'model_name',
@@ -22,9 +22,9 @@ ai_model_center = (
     'update_time',
     'update_user',
     'is_delete'
-)
+]
 
-ai_model_data_center = {
+ai_model_data_center = [
     'id',
     'task_id',
     'model_unique_code',
@@ -41,28 +41,28 @@ ai_model_data_center = {
     'update_time',
     'update_user',
     'is_delete'
-}
+]
 
-ai_model_finish_template_info={
-    'id',
+ai_model_finish_template_info=[
+    # 'id',
     'task_id',
     'model_unique_code',
     'system_source',
     'hospital_code',
-    'data_time',
+    # 'data_time',
     'study_primary_id',
     'template_id',
     'header_title',
     'title',
     'content',
     'score',
-    'create_time',
-    'update_time',
-    'update_user',
-    'is_delete'
-}
+    # 'create_time',
+    # 'update_time',
+    # 'update_user',
+    # 'is_delete'
+]
 
-ai_model_template_module_info={
+ai_model_template_module_info=[
     'id',
     'template_id',
     'header_title',
@@ -73,4 +73,4 @@ ai_model_template_module_info={
     'update_time',
     'update_user',
     'is_delete'
-}
+]

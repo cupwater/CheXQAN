@@ -1,7 +1,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-03-21 22:24:38
-LastEditTime: 2022-03-22 14:21:03
+LastEditTime: 2022-03-22 20:03:18
 Description: incremental inference new Chest X-ray images and write the results into database
 
 '''
@@ -155,12 +155,11 @@ def insert_ai_model_finish_template_info(conn, cursor, study_primary_id_list, sc
     insert_sql_prefix = gen_insert_sql(
         'ai_model_finish_template_info', table_schema.ai_model_finish_template_info)
 
-    id = 1
     for study_primary_id, scores in zip(study_primary_id_list, scores_list):
         _condition = f"study_primary_id='{study_primary_id}'"
         _sql = gen_select_sql('ai_model_data_center', _condition)
         result = db_execute_val(conn, cursor, _sql)[0]
-        val_prefix = tuple(result[1:7])
+        val_prefix = tuple(result[1:5] + result[6:7])
         insert_vals = []
         # since 'task_id',
         # 'model_unique_code',
@@ -171,13 +170,9 @@ def insert_ai_model_finish_template_info(conn, cursor, study_primary_id_list, sc
         # how to generate id?
         
         for template_meta, template_score in zip(module_info, scores):
-            val = tuple([id]) + val_prefix + \
-                tuple(template_meta[1:5]) + \
-                tuple([template_score]) + tuple(template_meta[6:])
+            val = val_prefix + tuple(template_meta[1:5]) + tuple([str(template_score)])
             insert_vals.append(val)
-            id += 1
         pdb.set_trace()
-
         row_count = db_execute_val(conn, cursor, insert_sql_prefix, insert_vals)
         print(f"insert {row_count} row number")
     return
