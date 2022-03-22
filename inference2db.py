@@ -1,32 +1,27 @@
 '''
 Author: Baoyun Peng
 Date: 2022-03-21 22:24:38
-LastEditTime: 2022-03-22 20:03:18
+LastEditTime: 2022-03-23 00:30:37
 Description: incremental inference new Chest X-ray images and write the results into database
 
 '''
 import torch
-import torchvision.transforms as transforms
 import torch.nn as nn
-import torch.backends.cudnn as cudnn
 
 import numpy as np
 import os.path
-import time
+import cv2
+from skimage import exposure as ex
 import pdb
 import pydicom as dicom
 
 import models
 from options import parser
-from db import crud_mysql
 from db import table_schema
 from db.crud_mysql import *
-
-import matplotlib.pyplot as plt
-import PIL.Image as Image
+from augmentation.medical_augment import XrayTestTransform
 
 new_dicom_list = []
-
 standard_tags = [
     "StudyID", "PatientName", "PatientSex",
     "PatientBirthDate", "PatientAge", "StudyDate",
@@ -36,6 +31,7 @@ standard_tags = [
     "StudyDescription", "WindowWidth", "WindowCenter",
     "EntranceDoseInmGy"
 ]
+use_cuda = False
 
 
 def dcm_tags_scores(ds, standard_tags=standard_tags):
@@ -52,14 +48,26 @@ def image_from_dicom(ds):
     '''
         read dicom file and convert to image
     '''
+    def he(img):
+        if(len(img.shape)==2):      #gray
+            outImg = ex.equalize_hist(img[:,:])*255 
+        elif(len(img.shape)==3):    #RGB
+            outImg = np.zeros((img.shape[0],img.shape[1],3))
+            for channel in range(img.shape[2]):
+                outImg[:, :, channel] = ex.equalize_hist(img[:, :, channel])*255
+
+        outImg[outImg>255] = 255
+        outImg[outImg<0] = 0
+        return outImg.astype(np.uint8)
     try:
         # ds = pydicom.dcmread(dicom_files, force=True)
         # convert datatype to float
         new_image = ds.pixel_array.astype(float)
         # Not sure if there are negative values for grayscale in the dicom code
         dcm_image = (np.maximum(new_image, 0) / new_image.max()) * 255.0
-        dcm_image = Image.fromarray(np.uint8(dcm_image))
-        return dcm_image
+        dcm_image = dcm_image.astype(np.uint8)
+        rgb_img = he(cv2.cvtColor(dcm_image,cv2.COLOR_GRAY2RGB))
+        return rgb_img
     except AttributeError:
         print('Unable to convert the pixel data: one of Pixel Data, Float Pixel Data or Double Float Pixel Data must be present in the dataset')
         return None
@@ -88,8 +96,17 @@ def get_xray_scores(model, data, transform=None):
     # transform the data
     model.eval()
     xray_scores = []
-    for image in data:
-        xray_scores.append(np.ones(20))
+    for img in data:
+        img = transform(image=img)['image']
+        img = img.transpose((2,0,1))
+        input_data = torch.FloatTensor(img)
+        input_data = input_data.unsqueeze(0)
+        if use_cuda:
+            input_data = input_data.cuda()
+        predict_score = model(input_data)
+        if use_cuda:
+            predict_score = predict_score.cpu()
+        xray_scores.append(predict_score.data.numpy().reshape(-1))
     return np.array(xray_scores)
 
 
@@ -97,6 +114,7 @@ def init_ai_quality_model(args):
     '''
         initial the ai quality model
     '''
+    global use_cuda
     model = models.__dict__[args.arch](num_classes=args.num_classes)
     model.classifier = nn.Sequential(
         nn.Linear(model.classifier.in_features, args.num_classes), nn.Sigmoid())
@@ -123,8 +141,9 @@ def inference(model, new_dicom_list):
         data.append(xray_image)
         tag_scores.append(tag_score)
         study_primary_id_list.append(study_primary_id)
+    transform = XrayTestTransform(crop_size=512, img_size=512)
     # inference to get the xray_score
-    xray_scores = get_xray_scores(model, data)
+    xray_scores = get_xray_scores(model, data, transform)
     tags_scores = np.array(tag_scores, dtype=np.float32)
     scores = np.concatenate((tags_scores, xray_scores), axis=1)
     return study_primary_id_list, scores
@@ -168,11 +187,9 @@ def insert_ai_model_finish_template_info(conn, cursor, study_primary_id_list, sc
         # 'data_time',
         # 'study_primary_id',
         # how to generate id?
-        
         for template_meta, template_score in zip(module_info, scores):
             val = val_prefix + tuple(template_meta[1:5]) + tuple([str(template_score)])
             insert_vals.append(val)
-        pdb.set_trace()
         row_count = db_execute_val(conn, cursor, insert_sql_prefix, insert_vals)
         print(f"insert {row_count} row number")
     return
