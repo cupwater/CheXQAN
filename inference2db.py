@@ -1,7 +1,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-03-21 22:24:38
-LastEditTime: 2022-03-22 09:59:26
+LastEditTime: 2022-03-22 14:21:03
 Description: incremental inference new Chest X-ray images and write the results into database
 
 '''
@@ -19,7 +19,8 @@ import pydicom as dicom
 import models
 from options import parser
 from db import crud_mysql
-from db.crud_mysql import gen_update_sql, gen_select_sql, gen_insert_sql, get_connect, close_connect, db_execute_val
+from db import table_schema
+from db.crud_mysql import *
 
 import matplotlib.pyplot as plt
 import PIL.Image as Image
@@ -69,29 +70,15 @@ def acquire_incremental_list(late_time=0, data_path='/data/ks3downloadfromdb/'):
         acquire the incremental data by create_time
     '''
     global new_dicom_list
-    allfilelist=os.listdir(data_path)
+    allfilelist = os.listdir(data_path)
     for file in allfilelist:
-        file_path=os.path.join(data_path, file)
+        file_path = os.path.join(data_path, file)
         if os.path.isdir(file_path):
             acquire_incremental_list(late_time, file_path)
-        elif file_path.strip().split('.')[-1] == 'dcm' and os.path.getmtime(file_path)>late_time:
-                study_primary_id = file_path.split('/')[6]
-                new_dicom_list.append((study_primary_id, file_path))
+        elif file_path.strip().split('.')[-1] == 'dcm' and os.path.getmtime(file_path) > late_time:
+            study_primary_id = file_path.split('/')[6]
+            new_dicom_list.append((study_primary_id, file_path))
     return new_dicom_list
-
-# def acquire_incremental_list(late_time=0, data_path='/data/ks3downloadfromdb/'):
-#     '''
-#         acquire the incremental data by create_time
-#     '''
-#     new_dicom_list = []
-#     for main_dir, dirs, file_name_list in os.walk(data_path):
-#         for file in file_name_list:
-#             if os.path.splitext(file)[-1] == 'dcm':
-#                 file_path = os.path.join(main_dir, file)
-#                 if len(main_dir.split('/')) > 4 and time.ctime(os.path.getmtime(file_path)) > late_time:
-#                     study_primary_id = main_dir.split('/')[3]
-#                     new_dicom_list.append((study_primary_id,  file_path))
-#     return new_dicom_list
 
 
 def get_xray_scores(model, data, transform=None):
@@ -102,7 +89,7 @@ def get_xray_scores(model, data, transform=None):
     model.eval()
     xray_scores = []
     for image in data:
-        xray_scores.append(np.ones(len(data)))
+        xray_scores.append(np.ones(20))
     return np.array(xray_scores)
 
 
@@ -139,7 +126,7 @@ def inference(model, new_dicom_list):
     # inference to get the xray_score
     xray_scores = get_xray_scores(model, data)
     tags_scores = np.array(tag_scores, dtype=np.float32)
-    scores = np.concatenate((xray_scores, tags_scores), axis=1)
+    scores = np.concatenate((tags_scores, xray_scores), axis=1)
     return study_primary_id_list, scores
 
 
@@ -147,12 +134,53 @@ def update_ai_model_data_center(conn, cursor, study_primary_id_list, scores):
     '''
         update the scores of new study_primary_id_list using inference results in database
     '''
+    results = []
     for study_primary_id, score in zip(study_primary_id_list, scores):
         _condition = f"study_primary_id='{study_primary_id}'"
         ai_score = round(1.0*np.sum(score) / len(score) * 100, 2)
         _new_value = f"ai_score = '{str(ai_score)}'"
         _sql = gen_update_sql('ai_model_data_center', _condition, _new_value)
-        result = db_execute_val(conn, cursor, _sql)
+        results.append(db_execute_val(conn, cursor, _sql))
+    return results
+
+
+def insert_ai_model_finish_template_info(conn, cursor, study_primary_id_list, scores_list):
+    '''
+        write the detail scores of each dcm into ai_model_finish_template_info
+    '''
+    # first, select the module information from ai_model_finish_module_info table
+    module_info_sql = gen_select_sql('ai_model_template_module_info')
+    module_info = db_execute_val(conn, cursor, module_info_sql)
+
+    insert_sql_prefix = gen_insert_sql(
+        'ai_model_finish_template_info', table_schema.ai_model_finish_template_info)
+
+    id = 1
+    for study_primary_id, scores in zip(study_primary_id_list, scores_list):
+        _condition = f"study_primary_id='{study_primary_id}'"
+        _sql = gen_select_sql('ai_model_data_center', _condition)
+        result = db_execute_val(conn, cursor, _sql)[0]
+        val_prefix = tuple(result[1:7])
+        insert_vals = []
+        # since 'task_id',
+        # 'model_unique_code',
+        # 'system_source',
+        # 'hospital_code',
+        # 'data_time',
+        # 'study_primary_id',
+        # how to generate id?
+        
+        for template_meta, template_score in zip(module_info, scores):
+            val = tuple([id]) + val_prefix + \
+                tuple(template_meta[1:5]) + \
+                tuple([template_score]) + tuple(template_meta[6:])
+            insert_vals.append(val)
+            id += 1
+        pdb.set_trace()
+
+        row_count = db_execute_val(conn, cursor, insert_sql_prefix, insert_vals)
+        print(f"insert {row_count} row number")
+    return
 
 
 def main():
@@ -165,4 +193,9 @@ def main():
     model = init_ai_quality_model(args)
     study_primary_id_list, scores = inference(model, new_dicom_list)
     update_ai_model_data_center(conn, cursor, study_primary_id_list, scores)
-    
+    insert_ai_model_finish_template_info(
+        conn, cursor, study_primary_id_list, scores.tolist())
+
+
+if __name__ == '__main__':
+    main()

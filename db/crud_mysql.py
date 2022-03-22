@@ -3,7 +3,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-03-13 23:37:14
-LastEditTime: 2022-03-21 22:45:51
+LastEditTime: 2022-03-22 13:39:32
 Description: CRUD functions for MySQL
  reference: https://www.cnblogs.com/xuanzhi201111/p/5144982.html
 
@@ -60,7 +60,7 @@ def db_execute_val(conn, cursor, sql, val=None):
 def gen_insert_sql(table_name, table_schema_dict):
     _sql = f"INSERT INTO {table_name} ("
     _posix = ""
-    for key, _ in table_schema_dict.items():
+    for key in table_schema_dict:
         _sql += key + ', '
         _posix += "%s, "
     _sql = _sql + ") VALUES ("
