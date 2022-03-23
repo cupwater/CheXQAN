@@ -1,7 +1,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-03-21 22:24:38
-LastEditTime: 2022-03-23 00:30:37
+LastEditTime: 2022-03-23 18:24:39
 Description: incremental inference new Chest X-ray images and write the results into database
 
 '''
@@ -34,6 +34,9 @@ standard_tags = [
 use_cuda = False
 
 
+levels = ['D', 'D', 'D', 'C', 'B', 'A' ]
+
+
 def dcm_tags_scores(ds, standard_tags=standard_tags):
     '''
         return the score about tags information completation
@@ -49,15 +52,16 @@ def image_from_dicom(ds):
         read dicom file and convert to image
     '''
     def he(img):
-        if(len(img.shape)==2):      #gray
-            outImg = ex.equalize_hist(img[:,:])*255 
-        elif(len(img.shape)==3):    #RGB
-            outImg = np.zeros((img.shape[0],img.shape[1],3))
+        if(len(img.shape) == 2):  # gray
+            outImg = ex.equalize_hist(img[:, :])*255
+        elif(len(img.shape) == 3):  # RGB
+            outImg = np.zeros((img.shape[0], img.shape[1], 3))
             for channel in range(img.shape[2]):
-                outImg[:, :, channel] = ex.equalize_hist(img[:, :, channel])*255
+                outImg[:, :, channel] = ex.equalize_hist(
+                    img[:, :, channel])*255
 
-        outImg[outImg>255] = 255
-        outImg[outImg<0] = 0
+        outImg[outImg > 255] = 255
+        outImg[outImg < 0] = 0
         return outImg.astype(np.uint8)
     try:
         # ds = pydicom.dcmread(dicom_files, force=True)
@@ -66,7 +70,7 @@ def image_from_dicom(ds):
         # Not sure if there are negative values for grayscale in the dicom code
         dcm_image = (np.maximum(new_image, 0) / new_image.max()) * 255.0
         dcm_image = dcm_image.astype(np.uint8)
-        rgb_img = he(cv2.cvtColor(dcm_image,cv2.COLOR_GRAY2RGB))
+        rgb_img = he(cv2.cvtColor(dcm_image, cv2.COLOR_GRAY2RGB))
         return rgb_img
     except AttributeError:
         print('Unable to convert the pixel data: one of Pixel Data, Float Pixel Data or Double Float Pixel Data must be present in the dataset')
@@ -98,7 +102,7 @@ def get_xray_scores(model, data, transform=None):
     xray_scores = []
     for img in data:
         img = transform(image=img)['image']
-        img = img.transpose((2,0,1))
+        img = img.transpose((2, 0, 1))
         input_data = torch.FloatTensor(img)
         input_data = input_data.unsqueeze(0)
         if use_cuda:
@@ -157,7 +161,8 @@ def update_ai_model_data_center(conn, cursor, study_primary_id_list, scores):
     for study_primary_id, score in zip(study_primary_id_list, scores):
         _condition = f"study_primary_id='{study_primary_id}'"
         ai_score = round(1.0*np.sum(score) / len(score) * 100, 2)
-        _new_value = f"ai_score = '{str(ai_score)}'"
+        ai_score_level = ai_score_level[int(ai_score/20)]
+        _new_value = f"ai_score = '{str(ai_score)}', ai_score_level = '{ai_score_level}', state = '2'"
         _sql = gen_update_sql('ai_model_data_center', _condition, _new_value)
         results.append(db_execute_val(conn, cursor, _sql))
     return results
@@ -188,9 +193,12 @@ def insert_ai_model_finish_template_info(conn, cursor, study_primary_id_list, sc
         # 'study_primary_id',
         # how to generate id?
         for template_meta, template_score in zip(module_info, scores):
-            val = val_prefix + tuple(template_meta[1:5]) + tuple([str(template_score)])
+            template_score = '是' if template_score > 0.5 else '否'
+            val = val_prefix + \
+                tuple(template_meta[1:5]) + tuple([template_score])
             insert_vals.append(val)
-        row_count = db_execute_val(conn, cursor, insert_sql_prefix, insert_vals)
+        row_count = db_execute_val(
+            conn, cursor, insert_sql_prefix, insert_vals)
         print(f"insert {row_count} row number")
     return
 
