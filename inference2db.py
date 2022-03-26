@@ -8,6 +8,7 @@ Description: incremental inference new Chest X-ray images and write the results 
 import torch
 import torch.nn as nn
 
+import time
 import numpy as np
 import os.path
 import cv2
@@ -77,7 +78,7 @@ def image_from_dicom(ds):
         return None
 
 
-def acquire_incremental_list(late_time=0, data_path='/data/ks3downloadfromdb/'):
+def acquire_incremental_list(last_time=0, data_path='/data/ks3downloadfromdb/'):
     '''
         acquire the incremental data by create_time
     '''
@@ -86,8 +87,8 @@ def acquire_incremental_list(late_time=0, data_path='/data/ks3downloadfromdb/'):
     for file in allfilelist:
         file_path = os.path.join(data_path, file)
         if os.path.isdir(file_path):
-            acquire_incremental_list(late_time, file_path)
-        elif file_path.strip().split('.')[-1] == 'dcm' and os.path.getmtime(file_path) > late_time:
+            acquire_incremental_list(last_time, file_path)
+        elif file_path.strip().split('.')[-1] == 'dcm' and os.path.getmtime(file_path) > last_time:
             study_primary_id = file_path.split('/')[6]
             new_dicom_list.append((study_primary_id, file_path))
     return new_dicom_list
@@ -161,7 +162,7 @@ def update_ai_model_data_center(conn, cursor, study_primary_id_list, scores):
     for study_primary_id, score in zip(study_primary_id_list, scores):
         _condition = f"study_primary_id='{study_primary_id}'"
         ai_score = round(1.0*np.sum(score) / len(score) * 100, 2)
-        ai_score_level = ai_score_level[int(ai_score/20)]
+        ai_score_level = levels[int(ai_score/20)]
         _new_value = f"ai_score = '{str(ai_score)}', ai_score_level = '{ai_score_level}', state = '2'"
         _sql = gen_update_sql('ai_model_data_center', _condition, _new_value)
         results.append(db_execute_val(conn, cursor, _sql))
@@ -193,9 +194,10 @@ def insert_ai_model_finish_template_info(conn, cursor, study_primary_id_list, sc
         # 'study_primary_id',
         # how to generate id?
         for template_meta, template_score in zip(module_info, scores):
-            template_score = '是' if template_score > 0.5 else '否'
+            template_content = '是' if template_score > 0.5 else '否'
+            template_score = '1' if template_score > 0.5 else '0'
             val = val_prefix + \
-                tuple(template_meta[1:5]) + tuple([template_score])
+                tuple(template_meta[1:4]) + tuple([template_content, template_score])
             insert_vals.append(val)
         row_count = db_execute_val(
             conn, cursor, insert_sql_prefix, insert_vals)
@@ -205,11 +207,17 @@ def insert_ai_model_finish_template_info(conn, cursor, study_primary_id_list, sc
 
 def main():
     args = parser.parse_args()
-    # acquire all the new data and get to image
-    new_dicom_list = acquire_incremental_list()
     # init the database connection
     conn, cursor = get_connect(
         'download', 'Down@0221', 'ai_model_quality_control')
+    _sql = f"select update_time from information_schema.tables where table_name='ai_model_finish_template_info';"
+    result = db_execute_val(conn, cursor, _sql)
+    last_time = time.mktime(time.strptime(str(result[0][0]), '%Y-%m-%d %H:%M:%S'))
+    # acquire all the new data and get to image
+    new_dicom_list = acquire_incremental_list(last_time)
+    if len(new_dicom_list) < 1:
+        print('no new data need to inference')
+        return
     model = init_ai_quality_model(args)
     study_primary_id_list, scores = inference(model, new_dicom_list)
     update_ai_model_data_center(conn, cursor, study_primary_id_list, scores)
