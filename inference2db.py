@@ -1,7 +1,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-03-21 22:24:38
-LastEditTime: 2022-03-23 18:24:39
+LastEditTime: 2022-04-01 14:40:30
 Description: incremental inference new Chest X-ray images and write the results into database
 
 '''
@@ -73,7 +73,7 @@ def image_from_dicom(ds):
         dcm_image = dcm_image.astype(np.uint8)
         rgb_img = he(cv2.cvtColor(dcm_image, cv2.COLOR_GRAY2RGB))
         return rgb_img
-    except AttributeError:
+    except Exception:
         print('Unable to convert the pixel data: one of Pixel Data, Float Pixel Data or Double Float Pixel Data must be present in the dataset')
         return None
 
@@ -94,7 +94,7 @@ def acquire_incremental_list(last_time=0, data_path='/data/ks3downloadfromdb/'):
     return new_dicom_list
 
 
-def get_xray_scores(model, data, transform=None):
+def get_xray_scores(model, data, transform=None, tasks_num=20):
     '''
         using ai_quality_model to evaluate the x-ray images, and return detail scores
     '''
@@ -102,6 +102,9 @@ def get_xray_scores(model, data, transform=None):
     model.eval()
     xray_scores = []
     for img in data:
+        if img is None:
+            xray_scores.append(-1*np.ones(tasks_num))
+            continue
         img = transform(image=img)['image']
         img = img.transpose((2, 0, 1))
         input_data = torch.FloatTensor(img)
@@ -111,7 +114,10 @@ def get_xray_scores(model, data, transform=None):
         predict_score = model(input_data)
         if use_cuda:
             predict_score = predict_score.cpu()
-        xray_scores.append(predict_score.data.numpy().reshape(-1))
+        predict_score = predict_score.data.numpy().reshape(-1)
+        predict_score[predict_score>0.5] = 1
+        predict_score[predict_score<=0.5] = 0
+        xray_scores.append(predict_score)
     return np.array(xray_scores)
 
 
@@ -161,9 +167,12 @@ def update_ai_model_data_center(conn, cursor, study_primary_id_list, scores):
     results = []
     for study_primary_id, score in zip(study_primary_id_list, scores):
         _condition = f"study_primary_id='{study_primary_id}'"
-        ai_score = round(1.0*np.sum(score) / len(score) * 100, 2)
+        success_score = score.copy()
+        success_score[success_score==-1] = 0
+        ai_score = round(1.0*np.sum(success_score) / len(success_score) * 100, 2)
         ai_score_level = levels[int(ai_score/20)]
-        _new_value = f"ai_score = '{str(ai_score)}', ai_score_level = '{ai_score_level}', state = '2'"
+        state = '2' if np.sum(success_score) < np.sum(score) else '4'
+        _new_value = f"ai_score = '{str(ai_score)}', ai_score_level = '{ai_score_level}', state = '{state}'"
         _sql = gen_update_sql('ai_model_data_center', _condition, _new_value)
         results.append(db_execute_val(conn, cursor, _sql))
     return results
