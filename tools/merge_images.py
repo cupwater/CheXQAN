@@ -8,6 +8,7 @@ Description: Since there are some images in Shukang Chest-Xray which the pixel v
 import imageio
 import sys
 import numpy as np
+import pdb
 import cv2
 
 def main():
@@ -51,4 +52,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
