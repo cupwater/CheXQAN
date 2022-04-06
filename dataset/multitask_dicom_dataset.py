@@ -1,7 +1,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-04-02 09:42:38
-LastEditTime: 2022-04-02 10:18:45
+LastEditTime: 2022-04-06 23:50:02
 Description: 
 
 '''
@@ -42,8 +42,7 @@ class MultiTaskDicomDataset (Dataset):
 
     def dcm_tags_scores(self, ds, standard_tags=standard_tags):
         '''
-            return the score about tags information completation
-            if all the tags of standard_tags are present in dcm, return 100
+            return the score about tags information
         '''
         dcm_tags = ds.dir()
         scores = [1 if tag in dcm_tags else 0 for tag in standard_tags]
@@ -87,7 +86,7 @@ class MultiTaskDicomDataset (Dataset):
         xray_image, state = self.image_from_dicom(ds)
         rgb_img = self.transform(image=xray_image)['image']
         rgb_img = np.transpose(rgb_img, (2,1,0))
-        return rgb_img, np.array(tag_score), study_primary_id, state
+        return rgb_img, np.array(tag_score), study_primary_id, state, file_path
 
     def __len__(self):
         return len(self.new_dicom_list)
