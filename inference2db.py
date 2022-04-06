@@ -1,7 +1,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-03-21 22:24:38
-LastEditTime: 2022-04-02 10:40:35
+LastEditTime: 2022-04-06 21:20:49
 Description: incremental inference new Chest X-ray images and write the results into database
 
 '''
@@ -25,35 +25,35 @@ from dataset import MultiTaskDicomDataset
 
 use_cuda = False
 levels = ['D', 'D', 'D', 'C', 'B', 'A' ]
+new_dicom_list = []
 
 
 def acquire_incremental_list(last_time=0, data_path='/data/ks3downloadfromdb/'):
     '''
         acquire the incremental data by create_time
     '''
-    # global new_dicom_list
-    new_dicom_list = []
+    global new_dicom_list
     allfilelist = os.listdir(data_path)
     for file in allfilelist:
         file_path = os.path.join(data_path, file)
         if os.path.isdir(file_path):
             acquire_incremental_list(last_time, file_path)
-        elif file_path.strip().split('.')[-1] == 'dcm' and os.path.getmtime(file_path) > last_time:
-            study_primary_id = file_path.split('/')[6]
-            new_dicom_list.append((study_primary_id, file_path))
-    return new_dicom_list
+        elif file_path.strip().split('.')[-1] == 'dcm':
+            if os.path.getmtime(file_path) > last_time:
+                study_primary_id = file_path.split('/')[6]
+                new_dicom_list.append((study_primary_id, file_path))
 
 
-def inference(model, new_dicom_list):
+def inference(model):
     '''
         evaluate the dicom by check tags completation and ai_quality_model, return the detail scores
     '''
-    # transform the data
+    global new_dicom_list
     model.eval()
 
-    transform_test = XrayTestTransform(rop_size=512, img_size=512)
+    transform_test = XrayTestTransform(crop_size=512, img_size=512)
     testset = MultiTaskDicomDataset(new_dicom_list, transform_test)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=32, shuffle=True, num_workers=5)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=8, shuffle=False, num_workers=5)
 
     scores = []
     study_primary_ids = []
@@ -61,7 +61,8 @@ def inference(model, new_dicom_list):
 
     for _, (inputs, tag_scores, ids, state) in enumerate(testloader):
         if use_cuda:
-            inputs, targets = inputs.cuda(), targets.cuda()
+            #inputs, tag_scores = inputs.cuda(), tag_scores.cuda()
+            inputs = inputs.cuda()
         inputs = torch.autograd.Variable(inputs)
         xray_scores = model(inputs)
         if use_cuda:
@@ -158,13 +159,15 @@ def main():
     _sql = f"select update_time from information_schema.tables where table_name='ai_model_finish_template_info';"
     result = db_execute_val(conn, cursor, _sql)
     last_time = time.mktime(time.strptime(str(result[0][0]), '%Y-%m-%d %H:%M:%S'))
+    last_time = 0
     # acquire all the new data and get to image
-    new_dicom_list = acquire_incremental_list(last_time)
+    acquire_incremental_list(last_time)
     if len(new_dicom_list) < 1:
         print('no new data need to inference')
         return
     model = init_ai_quality_model(args)
-    study_primary_ids, scores, states = inference(model, new_dicom_list)
+    study_primary_ids, scores, states = inference(model)
+    pdb.set_trace()
     update_ai_model_data_center(conn, cursor, study_primary_ids, scores, states)
     insert_ai_model_finish_template_info(
         conn, cursor, study_primary_ids, scores.tolist())
