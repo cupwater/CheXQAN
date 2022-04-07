@@ -1,7 +1,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-03-21 22:24:38
-LastEditTime: 2022-04-07 02:21:23
+LastEditTime: 2022-04-07 12:57:54
 Description: incremental inference new Chest X-ray images and write the results into database
 
 '''
@@ -31,7 +31,7 @@ failed_list = []
 
 processed_path = 'logs/succeed_list.txt'
 failed_path = 'logs/failed_list.txt'
-global_mode = 'normal'
+global_mode = 'debug'
 
 def acquire_processed_list():
     '''
@@ -63,6 +63,22 @@ def acquire_incremental_list(data_path='/data/ks3downloadfromdb/'):
                 study_primary_id = file_path.split('/')[6]
                 new_dicom_list.append((study_primary_id, file_path))
 
+
+def db_acquire_incremental_list(conn, cursor, data_path='/data/ks3downloadfromdb/'):
+    '''
+        acquire the incremental data by create_time
+    '''
+    global new_dicom_list
+    results = db_execute_val(conn, cursor, 'select * from ai_model_data_center')
+    prefix = '/data/ks3downloadfromdb/QYZK/'
+    for item in results:
+        # pdb.set_trace()
+        if int(item[11]) == 1:
+            url_paths = item[7].split('?')[0].split('/')
+            _posix = os.path.join(url_paths[-3], url_paths[-2], url_paths[-1])
+            _mid = os.path.join(item[4], item[1], item[6], '000000', item[4])
+            full_path = os.path.join(prefix, _mid, _posix)
+            new_dicom_list.append((item[6], full_path))
 
 def init_ai_quality_model(args):
     '''
@@ -112,7 +128,7 @@ def inference(model):
 
         tag_scores = np.array(tag_scores).reshape(tag_scores.size(0), -1)
         _score = np.concatenate((tag_scores, xray_scores), axis=1)
-        scores.append(_score)
+        scores += _score.reshape(-1).tolist()
         study_primary_ids += ids
         states += state
         file_paths += file_path
@@ -130,8 +146,8 @@ def inference(model):
         fout.writelines("\n".join(current_failed_list))
     with open(processed_path, 'a+') as fout:
         fout.writelines("\n".join(current_processed_list))
-
-    return study_primary_ids, np.array(scores).reshape(len(states), -1), states
+    scores = np.array(scores).reshape(len(states), -1)
+    return study_primary_ids, scores.tolist(), states
 
 
 def update_ai_model_data_center(conn, cursor, study_primary_id_list, scores, states):
@@ -216,18 +232,18 @@ def main():
 
     # acquire all the new data
     acquire_processed_list()
-    acquire_incremental_list()
+    db_acquire_incremental_list(conn, cursor)
     if len(new_dicom_list) < 1:
         print('no new data need to inference')
         return
     
     model = init_ai_quality_model(args)
     study_primary_ids, scores, states = inference(model)
-    pdb.set_trace()
+    # pdb.set_trace()
     update_ai_model_data_center(
         conn, cursor, study_primary_ids, scores, states)
     insert_ai_model_finish_template_info(
-        conn, cursor, study_primary_ids, scores.tolist(), states)
+        conn, cursor, study_primary_ids, scores, states)
 
 if __name__ == '__main__':
     main()

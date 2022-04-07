@@ -3,7 +3,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-03-13 23:37:14
-LastEditTime: 2022-04-07 02:18:14
+LastEditTime: 2022-04-07 12:08:56
 Description: CRUD functions for MySQL
  reference: https://www.cnblogs.com/xuanzhi201111/p/5144982.html
 
@@ -105,6 +105,9 @@ if __name__ == "__main__":
     conn, cursor = get_connect('download', 'Down@0221', 'ai_model_quality_control')
     select_sql = gen_select_sql('ai_model_data_center')
     result = db_execute_val(conn, cursor, select_sql)
+
+    pdb.set_trace()
+
     table_name = 'ai_model_data_center'
     condition_str = "id=20"
     new_value = "ai_score=87"
