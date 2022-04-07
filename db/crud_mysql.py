@@ -3,7 +3,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-03-13 23:37:14
-LastEditTime: 2022-03-22 20:08:57
+LastEditTime: 2022-04-07 12:08:56
 Description: CRUD functions for MySQL
  reference: https://www.cnblogs.com/xuanzhi201111/p/5144982.html
 
@@ -41,21 +41,33 @@ def close_connect(conn, cursor):
     cursor.close()
     conn.close()
 
-def db_execute_val(conn, cursor, sql, val=None):
-    if val is None:
-        cursor.execute(sql)
+def db_execute_val(conn, cursor, sql, val=None, mode='normal'):
+    if mode=='normal':
+        if val is None:
+            cursor.execute(sql)
+        else:
+            cursor.executemany(sql, val)
+        conn.commit()
+        if 'select' in sql.lower():
+            # get the query result
+            result = cursor.fetchall()
+        elif 'insert' in sql.lower():
+            # get the number of insert row 
+            result = cursor.rowcount
+        else:
+            result = None
+        return result
     else:
-        cursor.executemany(sql, val)
-    conn.commit()
-    if 'select' in sql.lower():
-        # get the query result
-        result = cursor.fetchall()
-    elif 'insert' in sql.lower():
-        # get the number of insert row 
-        result = cursor.rowcount
-    else:
-        result = None
-    return result
+        if 'select' in sql.lower():
+            cursor.execute(sql)
+            conn.commit()
+            result = cursor.fetchall()
+        else:
+            with open('logs/execute.txt', 'a+') as fout:
+                fout.write(sql + '\n')  
+            result = 0
+        return result
+
 
 def gen_insert_sql(table_name, table_schema):
     _sql = f"INSERT INTO {table_name} ("
@@ -93,6 +105,9 @@ if __name__ == "__main__":
     conn, cursor = get_connect('download', 'Down@0221', 'ai_model_quality_control')
     select_sql = gen_select_sql('ai_model_data_center')
     result = db_execute_val(conn, cursor, select_sql)
+
+    pdb.set_trace()
+
     table_name = 'ai_model_data_center'
     condition_str = "id=20"
     new_value = "ai_score=87"

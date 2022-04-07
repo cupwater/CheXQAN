@@ -1,7 +1,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-04-02 09:42:38
-LastEditTime: 2022-04-02 10:18:45
+LastEditTime: 2022-04-06 23:50:02
 Description: 
 
 '''
@@ -19,6 +19,7 @@ from torch.utils.data import Dataset
 from skimage import exposure as ex
 import numpy as np
 from augmentation.medical_augment import XrayTestTransform
+import pdb
 
 __all__ = ['MultiTaskDicomDataset']
 
@@ -41,8 +42,7 @@ class MultiTaskDicomDataset (Dataset):
 
     def dcm_tags_scores(self, ds, standard_tags=standard_tags):
         '''
-            return the score about tags information completation
-            if all the tags of standard_tags are present in dcm, return 100
+            return the score about tags information
         '''
         dcm_tags = ds.dir()
         scores = [1 if tag in dcm_tags else 0 for tag in standard_tags]
@@ -74,8 +74,8 @@ class MultiTaskDicomDataset (Dataset):
             rgb_img = he(cv2.cvtColor(dcm_image, cv2.COLOR_GRAY2RGB))
             return rgb_img, 1
         except Exception:
-            print('Unable to convert the pixel data, replace with a random image')
-            rgb_img = he(cv2.cvtColor(cv2.imread('db/data/test.jpg'), cv2.COLOR_GRAY2RGB))
+            img = np.random.rand(512,512,3) * 255
+            rgb_img = he(img.astype('uint8'))
             return rgb_img, 0
 
     def __getitem__(self, index):
@@ -84,8 +84,9 @@ class MultiTaskDicomDataset (Dataset):
         ds = dicom.dcmread(file_path)
         tag_score = self.dcm_tags_scores(ds)
         xray_image, state = self.image_from_dicom(ds)
-        rgb_img = self.transform(xray_image)['image']
-        return rgb_img, tag_score, study_primary_id, state
+        rgb_img = self.transform(image=xray_image)['image']
+        rgb_img = np.transpose(rgb_img, (2,1,0))
+        return rgb_img, np.array(tag_score), study_primary_id, state, file_path
 
     def __len__(self):
         return len(self.new_dicom_list)
