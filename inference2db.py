@@ -1,7 +1,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-03-21 22:24:38
-LastEditTime: 2022-04-07 12:57:54
+LastEditTime: 2022-04-08 14:15:31
 Description: incremental inference new Chest X-ray images and write the results into database
 
 '''
@@ -24,53 +24,53 @@ from augmentation.medical_augment import XrayTestTransform
 from dataset import MultiTaskDicomDataset
 
 use_cuda = False
-levels = ['D', 'D', 'D', 'C', 'B', 'A']
+levels = ['D', 'D', 'D', 'D', 'D', 'D', 'C', 'C', 'B', 'A', 'A']
 new_dicom_list = []
-processed_list = []
-failed_list = []
-
-processed_path = 'logs/succeed_list.txt'
-failed_path = 'logs/failed_list.txt'
 global_mode = 'normal'
 
-def acquire_processed_list():
-    '''
-        acquire the processed list and failed list given file path
-    '''
-    global processed_list, failed_list
-    with open(processed_path) as fin:
-        processed_list = fin.readlines()
-        processed_list = [line.strip() for line in processed_list]
+# processed_list = []
+# failed_list = []
+# processed_path = 'logs/succeed_list.txt'
+# failed_path = 'logs/failed_list.txt'
 
-    failed_list = []
-    with open(failed_path) as fin:
-        failed_list = fin.readlines()
-        failed_list = [line.strip() for line in failed_list]
+
+# def acquire_processed_list(processed_list, failed_list):
+#     '''
+#         acquire the processed list and failed list given file path
+#     '''
+#     # global processed_list, failed_list
+#     with open(processed_path) as fin:
+#         processed_list = fin.readlines()
+#         processed_list = [line.strip() for line in processed_list]
+
+#     failed_list = []
+#     with open(failed_path) as fin:
+#         failed_list = fin.readlines()
+#         failed_list = [line.strip() for line in failed_list]
  
 
-def acquire_incremental_list(data_path='/data/ks3downloadfromdb/'):
-    '''
-        acquire the incremental data by create_time
-    '''
-    global new_dicom_list
-    allfilelist = os.listdir(data_path)
-    for file in allfilelist:
-        file_path = os.path.join(data_path, file)
-        if os.path.isdir(file_path):
-            acquire_incremental_list(file_path)
-        elif file_path.strip().split('.')[-1] == 'dcm':
-            if file_path not in processed_list and file_path not in failed_list:
-                study_primary_id = file_path.split('/')[6]
-                new_dicom_list.append((study_primary_id, file_path))
+# def acquire_incremental_list(data_path='/data/ks3downloadfromdb/'):
+#     '''
+#         acquire the incremental data by create_time
+#     '''
+#     global new_dicom_list
+#     allfilelist = os.listdir(data_path)
+#     for file in allfilelist:
+#         file_path = os.path.join(data_path, file)
+#         if os.path.isdir(file_path):
+#             acquire_incremental_list(file_path)
+#         elif file_path.strip().split('.')[-1] == 'dcm':
+#             if file_path not in processed_list and file_path not in failed_list:
+#                 study_primary_id = file_path.split('/')[6]
+#                 new_dicom_list.append((study_primary_id, file_path))
 
 
-def db_acquire_incremental_list(conn, cursor, data_path='/data/ks3downloadfromdb/'):
+def db_acquire_incremental_list(conn, cursor, prefix='/data/ks3downloadfromdb/QYZK'):
     '''
         acquire the incremental data by create_time
     '''
     global new_dicom_list
     results = db_execute_val(conn, cursor, 'select * from ai_model_data_center')
-    prefix = '/data/ks3downloadfromdb/QYZK/'
     for item in results:
         if int(item[11]) != 2:
             url_paths = item[7].split('?')[0].split('/')
@@ -97,7 +97,7 @@ def init_ai_quality_model(args):
     return model
 
 
-def inference(model):
+def inference(model, processed_path='logs/succeed.txt', failed_path='logs/failed.txt'):
     '''
         evaluate the dicom by check tags completation and ai_quality_model, return the detail scores
     '''
@@ -134,28 +134,24 @@ def inference(model):
         states += state
         file_paths += file_path
 
-    
-    current_failed_list = []
-    current_processed_list = []
+    failed_list = []
+    processed_list = []
     for state, file_path in zip(states, file_paths):
         # state == 0 means failed to parse image, 1 means succeed
         if state == 0:
-            current_failed_list.append(file_path)
+            failed_list.append(file_path)
         else:
-            current_processed_list.append(file_path)
+            processed_list.append(file_path)
 
-    with open(failed_path, 'a+') as fout:
-        fout.writelines("\n".join(current_failed_list))
-    with open(processed_path, 'a+') as fout:
-        fout.writelines("\n".join(current_processed_list))
     scores = np.array(scores).reshape(len(states), -1)
-    return study_primary_ids, scores.tolist(), states
+    return study_primary_ids, scores.tolist(), states, processed_list, failed_list
 
 
-def update_ai_model_data_center(conn, cursor, study_primary_id_list, scores, states):
+def update_ai_model_data_center(conn, cursor, study_primary_id_list, scores, states, logger_path='logs/execute.txt'):
     '''
         update the scores of new study_primary_id_list using inference results in database
     '''
+    logger = open(logger_path, 'w')
     results = []
     for study_primary_id, score, state in zip(study_primary_id_list, scores, states):
         _condition = f"study_primary_id='{study_primary_id}'"
@@ -163,21 +159,23 @@ def update_ai_model_data_center(conn, cursor, study_primary_id_list, scores, sta
         success_score = [ 1 if s >= 0.5 else 0 for s in success_score ]
         ai_score = round(1.0*np.sum(success_score) /
                          len(success_score) * 100, 2)
-        ai_score_level = levels[int(ai_score/20)]
+        ai_score_level = levels[int(ai_score/10)]
         if state == 0:
             ai_score = -1
             _new_value = f"ai_score = '{str(ai_score)}', state = '3'"
         else:
             _new_value = f"ai_score = '{str(ai_score)}', ai_score_level = '{ai_score_level}', state = '2'"
         _sql = gen_update_sql('ai_model_data_center', _condition, _new_value)
-        results.append(db_execute_val(conn, cursor, _sql, mode=global_mode))
+        results.append(db_execute_val(conn, cursor, _sql, mode=global_mode, logger=logger))
+    logger.close()
     return results
 
 
-def insert_ai_model_finish_template_info(conn, cursor, study_primary_id_list, scores_list, states):
+def insert_ai_model_finish_template_info(conn, cursor, study_primary_id_list, scores_list, states, logger_path='logs/execute.txt'):
     '''
         write the detail scores of each dcm into ai_model_finish_template_info
     '''
+    logger = open(logger_path, 'a+')
     # first, select the module information from ai_model_finish_module_info table
     module_info_sql = gen_select_sql('ai_model_template_module_info')
     module_info = db_execute_val(conn, cursor, module_info_sql)
@@ -192,8 +190,7 @@ def insert_ai_model_finish_template_info(conn, cursor, study_primary_id_list, sc
         _sql = gen_select_sql('ai_model_data_center', _condition)
         result = db_execute_val(conn, cursor, _sql)
         if len(result) == 0:
-            with open('logs/execute.txt', 'a+' ) as fout:
-                fout.write(f"error, no such data primary_study_id={study_primary_id} in ai_model_data_center")
+            logger.write(f"error, no such data primary_study_id={study_primary_id} in ai_model_data_center\n")
             continue
         result = result[0]
         val_prefix = tuple(result[1:5] + result[6:7])
@@ -216,12 +213,15 @@ def insert_ai_model_finish_template_info(conn, cursor, study_primary_id_list, sc
                 tuple([template_content, template_score])
             insert_vals.append(val)
         row_count = db_execute_val(
-            conn, cursor, insert_sql_prefix, insert_vals, mode=global_mode)
+            conn, cursor, insert_sql_prefix, insert_vals, mode=global_mode, logger=logger)
         print(f"insert {row_count} row number")
+    logger.close()
     return
 
 
 def main():
+    global processed_path, failed_path
+
     args = parser.parse_args()
     # init the database connection
     conn, cursor = get_connect(
@@ -232,19 +232,29 @@ def main():
     #     str(result[0][0]), '%Y-%m-%d %H:%M:%S'))
     # last_time = 0
 
-    # acquire all the new data
-    acquire_processed_list()
     db_acquire_incremental_list(conn, cursor)
     if len(new_dicom_list) < 1:
         print('no new data need to inference')
         return
-    
+        
     model = init_ai_quality_model(args)
-    study_primary_ids, scores, states = inference(model)
+    study_primary_ids, scores, states, processed_list, failed_list = inference(model)
+
+    # new a logger file according to execution time to record CRUD operations
+    time_now = time.strftime("%Y%m%d-%H%M", time.localtime())
+    path =os.path.join('logs', time_now) 
+    os.makedirs(path)
+    with open(os.path.join(path, 'succeed.txt'), 'w') as fout:
+        fout.writelines("\n".join(processed_list))
+    with open(os.path.join(path, 'failed.txt'), 'w') as fout:
+        fout.writelines("\n".join(failed_list))
+    
+    execute_path = os.path.join(path, 'execute.txt')
     update_ai_model_data_center(
-        conn, cursor, study_primary_ids, scores, states)
+        conn, cursor, study_primary_ids, scores, states, logger_path=execute_path)
     insert_ai_model_finish_template_info(
-        conn, cursor, study_primary_ids, scores, states)
+        conn, cursor, study_primary_ids, scores, states, logger_path=execute_path)
+
 
 if __name__ == '__main__':
     main()
