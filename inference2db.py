@@ -1,7 +1,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-03-21 22:24:38
-LastEditTime: 2022-04-08 00:11:58
+LastEditTime: 2022-04-08 14:10:30
 Description: incremental inference new Chest X-ray images and write the results into database
 
 '''
@@ -24,7 +24,7 @@ from augmentation.medical_augment import XrayTestTransform
 from dataset import MultiTaskDicomDataset
 
 use_cuda = False
-levels = ['D', 'D', 'D', 'C', 'B', 'A']
+levels = ['D', 'D', 'D', 'D', 'D', 'D', 'C', 'C', 'B', 'A', 'A']
 new_dicom_list = []
 global_mode = 'normal'
 
@@ -65,7 +65,7 @@ global_mode = 'normal'
 #                 new_dicom_list.append((study_primary_id, file_path))
 
 
-def db_acquire_incremental_list(conn, cursor, prefix='/data/ks3downloadfromdb/'):
+def db_acquire_incremental_list(conn, cursor, prefix='/data/ks3downloadfromdb/QYZK'):
     '''
         acquire the incremental data by create_time
     '''
@@ -159,7 +159,7 @@ def update_ai_model_data_center(conn, cursor, study_primary_id_list, scores, sta
         success_score = [ 1 if s >= 0.5 else 0 for s in success_score ]
         ai_score = round(1.0*np.sum(success_score) /
                          len(success_score) * 100, 2)
-        ai_score_level = levels[int(ai_score/20)]
+        ai_score_level = levels[int(ai_score/10)]
         if state == 0:
             ai_score = -1
             _new_value = f"ai_score = '{str(ai_score)}', state = '3'"
@@ -175,7 +175,7 @@ def insert_ai_model_finish_template_info(conn, cursor, study_primary_id_list, sc
     '''
         write the detail scores of each dcm into ai_model_finish_template_info
     '''
-    logger = open(logger_path, 'w')
+    logger = open(logger_path, 'a+')
     # first, select the module information from ai_model_finish_module_info table
     module_info_sql = gen_select_sql('ai_model_template_module_info')
     module_info = db_execute_val(conn, cursor, module_info_sql)
@@ -190,7 +190,7 @@ def insert_ai_model_finish_template_info(conn, cursor, study_primary_id_list, sc
         _sql = gen_select_sql('ai_model_data_center', _condition)
         result = db_execute_val(conn, cursor, _sql)
         if len(result) == 0:
-            logger.write(f"error, no such data primary_study_id={study_primary_id} in ai_model_data_center")
+            logger.write(f"error, no such data primary_study_id={study_primary_id} in ai_model_data_center\n")
             continue
         result = result[0]
         val_prefix = tuple(result[1:5] + result[6:7])
