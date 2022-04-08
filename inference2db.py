@@ -31,7 +31,7 @@ failed_list = []
 
 processed_path = 'logs/succeed_list.txt'
 failed_path = 'logs/failed_list.txt'
-global_mode = 'debug'
+global_mode = 'normal'
 
 def acquire_processed_list():
     '''
@@ -72,13 +72,14 @@ def db_acquire_incremental_list(conn, cursor, data_path='/data/ks3downloadfromdb
     results = db_execute_val(conn, cursor, 'select * from ai_model_data_center')
     prefix = '/data/ks3downloadfromdb/QYZK/'
     for item in results:
-        # pdb.set_trace()
-        if int(item[11]) == 1:
+        if int(item[11]) != 2:
             url_paths = item[7].split('?')[0].split('/')
-            _posix = os.path.join(url_paths[-3], url_paths[-2], url_paths[-1])
-            _mid = os.path.join(item[4], item[1], item[6], '000000', item[4])
+            _posix = os.path.join(url_paths[-4], url_paths[-3], url_paths[-2], url_paths[-1])
+            _mid = os.path.join(item[4], item[1], item[6], '000000')
             full_path = os.path.join(prefix, _mid, _posix)
             new_dicom_list.append((item[6], full_path))
+            if not os.path.exists(full_path):
+                print(full_path)
 
 def init_ai_quality_model(args):
     '''
@@ -132,6 +133,7 @@ def inference(model):
         study_primary_ids += ids
         states += state
         file_paths += file_path
+
     
     current_failed_list = []
     current_processed_list = []
@@ -158,15 +160,15 @@ def update_ai_model_data_center(conn, cursor, study_primary_id_list, scores, sta
     for study_primary_id, score, state in zip(study_primary_id_list, scores, states):
         _condition = f"study_primary_id='{study_primary_id}'"
         success_score = score.copy()
-        success_score[success_score == -1] = 0
+        success_score = [ 1 if s >= 0.5 else 0 for s in success_score ]
         ai_score = round(1.0*np.sum(success_score) /
                          len(success_score) * 100, 2)
         ai_score_level = levels[int(ai_score/20)]
         if state == 0:
             ai_score = -1
-            ai_score_level = 'N'
-        state = '2' if state == 1 else '3'
-        _new_value = f"ai_score = '{str(ai_score)}', ai_score_level = '{ai_score_level}', state = '{state}'"
+            _new_value = f"ai_score = '{str(ai_score)}', state = '3'"
+        else:
+            _new_value = f"ai_score = '{str(ai_score)}', ai_score_level = '{ai_score_level}', state = '2'"
         _sql = gen_update_sql('ai_model_data_center', _condition, _new_value)
         results.append(db_execute_val(conn, cursor, _sql, mode=global_mode))
     return results
@@ -239,7 +241,6 @@ def main():
     
     model = init_ai_quality_model(args)
     study_primary_ids, scores, states = inference(model)
-    # pdb.set_trace()
     update_ai_model_data_center(
         conn, cursor, study_primary_ids, scores, states)
     insert_ai_model_finish_template_info(

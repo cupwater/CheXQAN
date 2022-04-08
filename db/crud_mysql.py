@@ -3,7 +3,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-03-13 23:37:14
-LastEditTime: 2022-04-07 12:08:56
+LastEditTime: 2022-04-07 13:03:07
 Description: CRUD functions for MySQL
  reference: https://www.cnblogs.com/xuanzhi201111/p/5144982.html
 
@@ -56,6 +56,8 @@ def db_execute_val(conn, cursor, sql, val=None, mode='normal'):
             result = cursor.rowcount
         else:
             result = None
+        with open('logs/execute.txt', 'a+') as fout:
+            fout.write(sql + '\n')  
         return result
     else:
         if 'select' in sql.lower():
