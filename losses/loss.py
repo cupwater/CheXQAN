@@ -1,12 +1,17 @@
+# coding: utf8
 '''
 Author: Baoyun Peng
 Date: 2022-02-23 16:17:31
-LastEditTime: 2022-03-03 16:18:42
+LastEditTime: 2022-04-09 12:26:56
 Description: loss function
 
 '''
 import torch
 from torch.nn import Module
+from torch import nn
+from torch.nn import functional as F
+
+__all__ = ['MaskedDiceLoss', 'FocalLoss', 'ConfidentMSELoss']
 
 def dice_loss(input, target):
     """Dice loss.
@@ -56,6 +61,51 @@ class MaskedDiceLoss(Module):
 
         return - dice
 
+
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=0.25, gamma=2, num_classes = 3, size_average=True):
+        """
+        focal_loss, -α(1-yi)**γ *ce_loss(xi,yi)
+        :param alpha: loss weight for each class. 
+        :param gamma: hyper-parameter to adjust hard sample
+        :param num_classes:
+        :param size_average:
+        """
+        super(focal_loss,self).__init__()
+        self.size_average = size_average
+        if isinstance(alpha,list):
+            assert len(alpha)==num_classes
+            self.alpha = torch.Tensor(alpha)
+        else:
+            assert alpha<1 
+            self.alpha = torch.zeros(num_classes)
+            self.alpha[0] += alpha
+            self.alpha[1:] += (1-alpha) # set alpha to [ α, 1-α, 1-α, 1-α, 1-α, ...] size:[num_classes]
+        self.gamma = gamma
+
+    def forward(self, preds, labels):
+        """
+        :param preds:   prediction. the size: [B,N,C] or [B,C]
+        :param labels:  ground-truth. size:[B,N] or [B]
+        :return:
+        """
+        # assert preds.dim()==2 and labels.dim()==1
+        preds = preds.view(-1,preds.size(-1))
+        self.alpha = self.alpha.to(preds.device)
+        preds_logsoft = F.log_softmax(preds, dim=1) # log_softmax
+        preds_softmax = torch.exp(preds_logsoft)    # softmax
+
+        preds_softmax = preds_softmax.gather(1,labels.view(-1,1))  
+        preds_logsoft = preds_logsoft.gather(1,labels.view(-1,1))
+        self.alpha = self.alpha.gather(0,labels.view(-1))
+        loss = -torch.mul(torch.pow((1-preds_softmax), self.gamma), preds_logsoft) 
+
+        loss = torch.mul(self.alpha, loss.t())
+        if self.size_average:
+            loss = loss.mean()
+        else:
+            loss = loss.sum()
+        return loss
 
 class ConfidentMSELoss(Module):
     def __init__(self, threshold=0.96):

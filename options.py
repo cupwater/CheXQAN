@@ -42,9 +42,9 @@ parser.add_argument('--test-batch', default=8, type=int, metavar='N',
                     help='test batchsize')
 parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
                     metavar='LR', help='initial learning rate')
-parser.add_argument('--schedule', type=int, nargs='+', default=[25, 40],
+parser.add_argument('--scheduler', type=int, nargs='+', default=[25, 40],
                         help='Decrease learning rate at these epochs.')
-parser.add_argument('--gamma', type=float, default=0.1, help='LR is multiplied by gamma on schedule.')
+parser.add_argument('--gamma', type=float, default=0.1, help='LR is multiplied by gamma on scheduler.')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
 parser.add_argument('--weight-decay', '--wd', default=5e-4, type=float,

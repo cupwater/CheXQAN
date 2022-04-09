@@ -191,7 +191,7 @@ def save_checkpoint(state, is_best, save_path='experiment/template', filename='c
 
 def adjust_learning_rate(optimizer, epoch):
     global state
-    if epoch in args.schedule:
+    if epoch in args.scheduler:
         state['lr'] *= args.gamma
         for param_group in optimizer.param_groups:
             param_group['lr'] = state['lr']

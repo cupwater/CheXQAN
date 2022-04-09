@@ -1,14 +1,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-04-02 09:42:38
-LastEditTime: 2022-04-06 23:50:02
-Description: 
-
-'''
-'''
-Author: Baoyun Peng
-Date: 2022-02-23 15:42:01
-LastEditTime: 2022-03-09 16:23:22
+LastEditTime: 2022-04-09 20:31:11
 Description: 
 
 '''
@@ -36,8 +29,8 @@ standard_tags = [
 class MultiTaskDicomDataset (Dataset):
     
     #-------------------------------------------------------------------------------- 
-    def __init__ (self, new_dicom_list,transform = XrayTestTransform(crop_size=512, img_size=512)):
-        self.new_dicom_list = new_dicom_list
+    def __init__ (self, dicom_list, transform = XrayTestTransform(crop_size=512, img_size=512)):
+        self.dicom_list = dicom_list
         self.transform = transform
 
     def dcm_tags_scores(self, ds, standard_tags=standard_tags):
@@ -80,7 +73,7 @@ class MultiTaskDicomDataset (Dataset):
 
     def __getitem__(self, index):
         # read the dicom
-        study_primary_id, file_path = self.new_dicom_list[index]
+        study_primary_id, file_path = self.dicom_list[index]
         ds = dicom.dcmread(file_path)
         tag_score = self.dcm_tags_scores(ds)
         xray_image, state = self.image_from_dicom(ds)
@@ -89,4 +82,4 @@ class MultiTaskDicomDataset (Dataset):
         return rgb_img, np.array(tag_score), study_primary_id, state, file_path
 
     def __len__(self):
-        return len(self.new_dicom_list)
+        return len(self.dicom_list)
