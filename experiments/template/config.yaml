@@ -1,0 +1,36 @@
+common:
+    arch: densenet121_512
+    workers: 5
+    train_batch: 8
+    test_batch: 8
+    shuffle_strategy: 1
+    lr: 0.001
+    gamma: 0.1
+    epoch: 30
+    scheduler: [15, 25]
+    momentum: 0.9
+    weight_decay: 0.0005
+    nesterov: True
+    print_interval: 1000
+    pretrained_weights: 'checkpoints/pretrained_densenet121.pth.tar'
+    save_path: 'experiments/template'
+
+loss_config:
+    type: BCEFocalLoss
+    alpha: 0.25
+    gamma: 3
+    num_classes: 2
+
+dataset : 
+    crop_size : 512
+    img_size : 512
+    num_classes: 13
+    type: MultiTaskInMemoryDataset
+    
+    train_list: 'data/train_list.txt'
+    train_meta: 'data/train_meta.txt'
+    train_mask: 'data/train_list.txt'
+    test_list: 'data/test_list.txt'
+    test_meta: 'data/test_meta.txt'
+    test_mask: 'data/test_list.txt'
+    prefix: 'data/'

@@ -8,6 +8,7 @@ from __future__ import print_function
 import os
 import shutil
 import time
+import yaml
 
 import torch
 import torch.nn as nn
@@ -15,114 +16,144 @@ import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torch.optim as optim
 import torch.utils.data as data
-import torchvision.transforms as transforms
 from augmentation.medical_augment import XrayTrainTransform, XrayTestTransform
 
 
 import models
 import dataset
-# from dataset.multitask_dataset import MultiTaskDataset
 from utils import Logger, AverageMeter, mkdir_p, progress_bar
 from options import parser
+import losses
 
 state = {}
-best_acc = 0  # best test accuracy
+best_acc = 0
+use_cuda = False
 
-def main():
-    global state
-    args = parser.parse_args()
-    state = {k: v for k, v in args._get_kwargs()}
-    #args.save_path = 'experiments/' + args.dataset + '/' + args.arch
-    if not os.path.isdir(args.save_path):
-        os.makedirs(args.save_path)
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id
+def main(config_file):
+    global state, best_acc, use_cuda
+
+    # parse config of model training
+    with open(config_file) as f:
+        config = yaml.load(f, Loader=yaml.FullLoader)
+    common_config = config['common']
+
+    state['lr'] = common_config['lr']
+    if not os.path.isdir(common_config['save_path']):
+        mkdir_p(common_config['save_path'])
     use_cuda = torch.cuda.is_available()
-    global best_acc
-    if not os.path.isdir(args.save_path):
-        mkdir_p(args.save_path)
 
-    # Data
-    print('==> Preparing dataset %s' % args.dataset)
-    transform_train = XrayTrainTransform(crop_size=args.crop_size, img_size=args.img_size)
-    transform_test = XrayTestTransform(crop_size=args.crop_size, img_size=args.img_size)
-    
-    trainset = dataset.__dict__[args.dataset](args.train_list, args.train_meta, transform_train, prefix=args.prefix)
-    trainloader = data.DataLoader(trainset, batch_size=args.train_batch, shuffle=True, num_workers=5)
-    testset = dataset.__dict__[args.dataset](args.test_list, args.test_meta, transform_test, prefix=args.prefix)
-    testloader = data.DataLoader(testset, batch_size=args.test_batch, shuffle=False, num_workers=5)
+    data_config = config['dataset']
+    # Dataset and Dataloader
+    transform_train = XrayTrainTransform(
+        crop_size=data_config['crop_size'], img_size=data_config['img_size'])
+    transform_test = XrayTestTransform(
+        crop_size=data_config['crop_size'], img_size=data_config['img_size'])
+    print('==> Preparing dataset %s' % data_config['type'])
+
+    # get mask_list from config
+    train_mask = data_config['train_mask'] if 'mask' in data_config else None
+    test_mask = data_config['test_mask'] if 'mask' in data_config else None
+
+    # create dataset for training and testing
+    trainset = dataset.__dict__[data_config['type']](
+        data_config['train_list'], data_config['train_meta'], transform_train,
+        mask_list=train_mask, prefix=data_config['prefix'])
+    testset = dataset.__dict__[data_config['type']](
+        data_config['test_list'], data_config['test_meta'], transform_test,
+        mask_list=test_mask, prefix=data_config['prefix'])
+
+    # create dataloader for training and testing
+    trainloader = data.DataLoader(
+        trainset, batch_size=common_config['train_batch'], shuffle=True, num_workers=5)
+    testloader = data.DataLoader(
+        testset, batch_size=common_config['train_batch'], shuffle=False, num_workers=5)
 
     # Model
-    print("==> creating model '{}'".format(args.arch))
-    model = models.__dict__[args.arch](num_classes=args.num_classes)
+    print("==> creating model '{}'".format(common_config['arch']))
+    model = models.__dict__[common_config['arch']](
+        num_classes=data_config['num_classes'])
     model.classifier = nn.Sequential(
-        nn.Linear(model.classifier.in_features, args.num_classes), nn.Sigmoid())
-    model.load_state_dict(torch.load(args.pretrained_weights)['state_dict'], strict=False)
+        nn.Linear(model.classifier.in_features, data_config['num_classes']), nn.Sigmoid())
+    model.load_state_dict(torch.load(common_config['pretrained_weights'])[
+                          'state_dict'], strict=False)
     if use_cuda:
         model = model.cuda()
     cudnn.benchmark = True
 
     # optimizer and scheduler
-    criterion = torch.nn.BCELoss()
+    criterion = losses.__dict__[config['loss_config']['type']]()
     optimizer = optim.SGD(
         filter(
             lambda p: p.requires_grad,
             model.parameters()),
-        lr=args.lr,
+        lr=common_config['lr'],
         momentum=0.9,
-        weight_decay=args.weight_decay)
+        weight_decay=common_config['weight_decay'])
 
     # logger
-    title = 'Chest X-ray Image Quality Assessment using ' + args.arch
-    logger = Logger(os.path.join(args.save_path, 'log.txt'), title=title)
-    logger.set_names(['Learning Rate', 'Train Loss', 'Valid Loss', 'Train Acc.', 'Valid Acc.'])
+    title = 'Chest X-ray Image Quality Assessment using ' + \
+        common_config['arch']
+    logger = Logger(os.path.join(
+        common_config['save_path'], 'log.txt'), title=title)
+    logger.set_names(['Learning Rate', 'Train Loss',
+                     'Valid Loss', 'Train Acc.', 'Valid Acc.'])
 
     # Train and val
-    for epoch in range(args.epoch):
-        adjust_learning_rate(optimizer, epoch, args)
-        # scheduler.step(losstensor.data[0])
-
-        print('\nEpoch: [%d | %d] LR: %f' % (epoch + 1, args.epoch, state['lr']))
-        train_loss, train_acc = train(trainloader, model, criterion, optimizer, use_cuda)
+    for epoch in range(common_config['epoch']):
+        adjust_learning_rate(optimizer, epoch, common_config)
+        print('\nEpoch: [%d | %d] LR: %f' %
+              (epoch + 1, common_config['epoch'], state['lr']))
+        train_loss, train_acc = train(
+            trainloader, model, criterion, optimizer, use_cuda)
         test_loss, test_acc = test(testloader, model, criterion, use_cuda)
         # append logger file
-        logger.append([state['lr'], train_loss, test_loss, train_acc, test_acc])
+        logger.append([state['lr'], train_loss,
+                      test_loss, train_acc, test_acc])
         # save model
         is_best = test_acc > best_acc
         best_acc = max(test_acc, best_acc)
         save_checkpoint({
-                'epoch': epoch + 1,
-                'state_dict': model.state_dict(),
-                'acc': test_acc,
-                'best_acc': best_acc,
-                'optimizer' : optimizer.state_dict(),
-            }, is_best, save_path=args.save_path)
+            'epoch': epoch + 1,
+            'state_dict': model.state_dict(),
+            'acc': test_acc,
+            'best_acc': best_acc,
+            'optimizer': optimizer.state_dict(),
+        }, is_best, save_path=common_config['save_path'])
 
     logger.close()
-
     print('Best acc:')
     print(best_acc)
+
 
 def train(trainloader, model, criterion, optimizer, use_cuda):
     # switch to train mode
     model.train()
 
     batch_time = AverageMeter()
-    data_time = AverageMeter()
-    losses = AverageMeter()
-    top1 = AverageMeter()
-    top5 = AverageMeter()
-    end = time.time()
+    data_time  = AverageMeter()
+    losses     = AverageMeter()
+    top1       = AverageMeter()
+    top5       = AverageMeter()
+    end        = time.time()
 
-    for batch_idx, (inputs, targets) in enumerate(trainloader):
+    for batch_idx, (data_package) in enumerate(trainloader):
         # measure data loading time
         data_time.update(time.time() - end)
-
+        if len(data_package) == 3:
+            inputs, mask, targets = data_package
+            if use_cuda:
+                mask = mask.cuda()
+            mask = torch.autograd.Variable(mask)
+        else:
+            inputs, targets = data_package
+        
         if use_cuda:
             inputs, targets = inputs.cuda(), targets.cuda()
-        inputs, targets = torch.autograd.Variable(inputs), torch.autograd.Variable(targets)
+        inputs = torch.autograd.Variable(inputs)
+        targets = torch.autograd.Variable(targets)
+            
         outputs = model(inputs)
-
         outputs = outputs.view(outputs.size(0), -1)
         targets = targets.view(targets.size(0), -1)
 
@@ -130,19 +161,21 @@ def train(trainloader, model, criterion, optimizer, use_cuda):
         predict = outputs > 0.5
         predict_res = (predict == targets)
         losses.update(loss.item(), inputs.size(0))
-        top1.update(torch.sum(predict_res.long())/(inputs.size(0)*targets.size(1)), predict_res.size(0))
+        top1.update(torch.sum(predict_res.long()) /
+                    (inputs.size(0)*targets.size(1)), predict_res.size(0))
         # compute gradient and do SGD step
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         progress_bar(batch_idx, len(trainloader), 'Loss: %.2f | Top1: %.2f | Top5: %.2f'
-                    % (losses.avg, top1.avg, top5.avg))
+                     % (losses.avg, top1.avg, top5.avg))
 
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
 
     return (losses.avg, top1.avg)
+
 
 def test(testloader, model, criterion, use_cuda):
     global best_acc
@@ -153,7 +186,7 @@ def test(testloader, model, criterion, use_cuda):
     data_time = AverageMeter()
     losses = AverageMeter()
     top1 = AverageMeter()
-    
+
     end = time.time()
     for batch_idx, (inputs, targets) in enumerate(testloader):
         # measure data loading time
@@ -161,7 +194,8 @@ def test(testloader, model, criterion, use_cuda):
 
         if use_cuda:
             inputs, targets = inputs.cuda(), targets.cuda()
-        inputs, targets = torch.autograd.Variable(inputs, volatile=True), torch.autograd.Variable(targets)
+        inputs, targets = torch.autograd.Variable(
+            inputs, volatile=True), torch.autograd.Variable(targets)
         # compute output
         outputs = model(inputs)
         outputs = outputs.view(outputs.size(0), -1)
@@ -171,29 +205,40 @@ def test(testloader, model, criterion, use_cuda):
         predict = outputs > 0.5
         predict_res = (predict == targets)
         losses.update(loss.item(), inputs.size(0))
-        
-        top1.update(torch.sum(predict_res.long())/(inputs.size(0)*targets.size(1)), predict_res.size(0))
+        top1.update(torch.sum(predict_res.long()) /
+                    (inputs.size(0)*targets.size(1)), predict_res.size(0))
 
         progress_bar(batch_idx, len(testloader), 'Loss: %.2f | Top1: %.2f'
-                    % (losses.avg, top1.avg))
+                     % (losses.avg, top1.avg))
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
 
     return (losses.avg, top1.avg)
 
-def save_checkpoint(state, is_best, save_path='experiment/template', filename='checkpoint.pth.tar'):
+
+def save_checkpoint(state, is_best, save_path, filename='checkpoint.pth.tar'):
     filepath = os.path.join(save_path, filename)
     torch.save(state, filepath)
     if is_best:
-        shutil.copyfile(filepath, os.path.join(save_path, 'model_best.pth.tar'))
+        shutil.copyfile(filepath, os.path.join(
+            save_path, 'model_best.pth.tar'))
 
-def adjust_learning_rate(optimizer, epoch, args):
+
+def adjust_learning_rate(optimizer, epoch, config):
     global state
-    if epoch in args.schedule:
-        state['lr'] *= args.gamma
+    if epoch in config['scheduler']:
+        state['lr'] *= config['gamma']
         for param_group in optimizer.param_groups:
             param_group['lr'] = state['lr']
 
+
 if __name__ == '__main__':
-    main()
+    import argparse
+    parser = argparse.ArgumentParser(
+        description='Medical Quality Assessment using AI')
+    # model related, including  Architecture, path, datasets
+    parser.add_argument('--config-file', type=str,
+                        default='experiments/template/config.yaml')
+    args = parser.parse_args()
+    main(args.config_file)
