@@ -2,7 +2,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-02-23 16:17:31
-LastEditTime: 2022-04-09 12:26:56
+LastEditTime: 2022-04-10 00:58:22
 Description: loss function
 
 '''
@@ -11,24 +11,50 @@ from torch.nn import Module
 from torch import nn
 from torch.nn import functional as F
 
-__all__ = ['MaskedDiceLoss', 'FocalLoss', 'ConfidentMSELoss']
+__all__ = ['DiceLoss', 'MaskedDiceLoss', 'FocalLoss', 'ConfidentMSELoss']
 
-def dice_loss(input, target):
+
+class BCELoss(Module):
     """Dice loss.
 
     :param input: The input (predicted)
     :param target:  The target (ground truth)
     :returns: the Dice score between 0 and 1.
     """
-    eps = 0.0001
+    def __init__(self):
+        super().__init__()
 
-    iflat = input.view(-1)
-    tflat = target.view(-1)
+    def forward(self, input, target):
 
-    intersection = (iflat * tflat).sum()
-    union = iflat.sum() + tflat.sum()
-    dice = (2.0 * intersection + eps) / (union + eps)
-    return - dice
+        iflat = input.view(-1)
+        tflat = target.view(-1)
+
+        intersection = (iflat * tflat).sum()
+        union = iflat.sum() + tflat.sum()
+        dice = (2.0 * intersection + self.eps) / (union + self.eps)
+        return - dice
+
+class DiceLoss(Module):
+    """Dice loss.
+
+    :param input: The input (predicted)
+    :param target:  The target (ground truth)
+    :returns: the Dice score between 0 and 1.
+    """
+    def __init__(self, eps = 0.0001):
+        super().__init__()
+        self.eps = eps
+
+    def forward(self, input, target):
+
+        iflat = input.view(-1)
+        tflat = target.view(-1)
+
+        intersection = (iflat * tflat).sum()
+        union = iflat.sum() + tflat.sum()
+        dice = (2.0 * intersection + self.eps) / (union + self.eps)
+        return - dice
+
 
 class MaskedDiceLoss(Module):
     """A masked version of the Dice loss.
@@ -71,7 +97,7 @@ class FocalLoss(nn.Module):
         :param num_classes:
         :param size_average:
         """
-        super(focal_loss,self).__init__()
+        super(FocalLoss,self).__init__()
         self.size_average = size_average
         if isinstance(alpha,list):
             assert len(alpha)==num_classes

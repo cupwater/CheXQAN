@@ -23,6 +23,7 @@ import models
 import dataset
 from utils import Logger, AverageMeter, mkdir_p, progress_bar
 from options import parser
+import losses
 
 state = {}
 best_acc = 0
@@ -81,7 +82,7 @@ def main(config_file):
     cudnn.benchmark = True
 
     # optimizer and scheduler
-    criterion = torch.nn.BCELoss()
+    criterion = losses.__dict__[config['loss_config']['type']]()
     optimizer = optim.SGD(
         filter(
             lambda p: p.requires_grad,
