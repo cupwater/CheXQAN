@@ -16,7 +16,7 @@ common:
     save_path: 'experiments/template'
 
 loss_config:
-    type: FocalLoss
+    type: BCEFocalLoss
     alpha: 0.25
     gamma: 3
     num_classes: 2
@@ -25,7 +25,7 @@ dataset :
     crop_size : 512
     img_size : 512
     num_classes: 13
-    type: MultiTaskDataset
+    type: MultiTaskInMemoryDataset
     
     train_list: 'data/train_list.txt'
     train_meta: 'data/train_meta.txt'

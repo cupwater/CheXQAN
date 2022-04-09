@@ -11,28 +11,25 @@ from torch.nn import Module
 from torch import nn
 from torch.nn import functional as F
 
-__all__ = ['DiceLoss', 'MaskedDiceLoss', 'FocalLoss', 'ConfidentMSELoss']
+__all__ = ['BCELoss', 'DiceLoss', 'MaskedDiceLoss', 'BCEFocalLoss', 'FocalLoss', 'ConfidentMSELoss']
 
 
-class BCELoss(Module):
-    """Dice loss.
-
-    :param input: The input (predicted)
-    :param target:  The target (ground truth)
-    :returns: the Dice score between 0 and 1.
-    """
+class BCELoss(nn.Module):
     def __init__(self):
-        super().__init__()
+        super(BCELoss, self).__init__()
+        self.pos_weight = 1
+        self.reduction = 'mean'
 
-    def forward(self, input, target):
+    def forward(self, logits, target):
+        # logits: [N, *], target: [N, *]
+        loss = - self.pos_weight * target * torch.log(logits) - \
+               (1 - target) * torch.log(1 - logits)
+        if self.reduction == 'mean':
+            loss = loss.mean()
+        elif self.reduction == 'sum':
+            loss = loss.sum()
+        return loss
 
-        iflat = input.view(-1)
-        tflat = target.view(-1)
-
-        intersection = (iflat * tflat).sum()
-        union = iflat.sum() + tflat.sum()
-        dice = (2.0 * intersection + self.eps) / (union + self.eps)
-        return - dice
 
 class DiceLoss(Module):
     """Dice loss.
