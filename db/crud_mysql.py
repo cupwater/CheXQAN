@@ -3,7 +3,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-03-13 23:37:14
-LastEditTime: 2022-04-07 12:08:56
+LastEditTime: 2022-04-08 14:15:26
 Description: CRUD functions for MySQL
  reference: https://www.cnblogs.com/xuanzhi201111/p/5144982.html
 
@@ -41,7 +41,9 @@ def close_connect(conn, cursor):
     cursor.close()
     conn.close()
 
-def db_execute_val(conn, cursor, sql, val=None, mode='normal'):
+def db_execute_val(conn, cursor, sql, val=None, mode='normal', logger=None):
+    if 'select' not in sql.lower() and logger is not None:
+        logger.write(sql + '\n')  
     if mode=='normal':
         if val is None:
             cursor.execute(sql)
@@ -61,10 +63,8 @@ def db_execute_val(conn, cursor, sql, val=None, mode='normal'):
         if 'select' in sql.lower():
             cursor.execute(sql)
             conn.commit()
-            result = cursor.fetchall()
+            result = cursor.fetchall() 
         else:
-            with open('logs/execute.txt', 'a+') as fout:
-                fout.write(sql + '\n')  
             result = 0
         return result
 
