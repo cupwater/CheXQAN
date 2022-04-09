@@ -2,7 +2,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-02-23 16:17:31
-LastEditTime: 2022-04-10 00:58:22
+LastEditTime: 2022-04-10 01:14:52
 Description: loss function
 
 '''
@@ -88,8 +88,24 @@ class MaskedDiceLoss(Module):
         return - dice
 
 
+class BCEFocalLoss(nn.Module):
+    def __init__(self, alpha=0.6, gamma=0.2, num_classes = 2):
+        super(BCEFocalLoss, self).__init__()
+        self.gamma = gamma
+        self.alpha = alpha
+        self.num_classes = 2
+        self.reduction = 'mean'
+
+    def forward(self, logits, target):
+        alpha = self.alpha
+        gamma = self.gamma
+        loss = - alpha * (1 - logits) ** gamma * target * torch.log(logits) - \
+               (1 - alpha) * logits ** gamma * (1 - target) * torch.log(1 - logits)
+        return loss.mean()
+
+
 class FocalLoss(nn.Module):
-    def __init__(self, alpha=0.25, gamma=2, num_classes = 3, size_average=True):
+    def __init__(self, alpha=0.25, gamma=2, num_classes = 2, size_average=True):
         """
         focal_loss, -α(1-yi)**γ *ce_loss(xi,yi)
         :param alpha: loss weight for each class. 
