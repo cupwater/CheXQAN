@@ -1,7 +1,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-03-09 16:19:21
-LastEditTime: 2022-04-09 23:32:59
+LastEditTime: 2022-04-09 23:46:52
 Description: 
 
 '''
@@ -60,9 +60,9 @@ class MultiTaskInMemoryDataset (Dataset):
         img = torch.FloatTensor(img)
         if self.mask_list is not None:
             mask = torch.FloatTensor(mask)
+            return img, mask, labels
         else:
-            mask = None
-        return img, mask, labels
+            return img, labels
 
     def __len__(self):
         return len(self.imgs_list)

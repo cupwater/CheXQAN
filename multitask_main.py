@@ -130,24 +130,28 @@ def train(trainloader, model, criterion, optimizer, use_cuda):
     model.train()
 
     batch_time = AverageMeter()
-    data_time = AverageMeter()
-    losses = AverageMeter()
-    top1 = AverageMeter()
-    top5 = AverageMeter()
-    end = time.time()
+    data_time  = AverageMeter()
+    losses     = AverageMeter()
+    top1       = AverageMeter()
+    top5       = AverageMeter()
+    end        = time.time()
 
-    for batch_idx, (inputs, mask, targets) in enumerate(trainloader):
+    for batch_idx, (data_package) in enumerate(trainloader):
         # measure data loading time
         data_time.update(time.time() - end)
+        if len(data_package) == 3:
+            inputs, mask, targets = data_package
+            if use_cuda:
+                mask = mask.cuda()
+            mask = torch.autograd.Variable(mask)
+        else:
+            inputs, targets = data_package
         
         if use_cuda:
             inputs, targets = inputs.cuda(), targets.cuda()
         inputs = torch.autograd.Variable(inputs)
         targets = torch.autograd.Variable(targets)
-        if mask:
-            mask = mask.cuda()
-            mask = torch.autograd.Variable(mask)
-        
+            
         outputs = model(inputs)
         outputs = outputs.view(outputs.size(0), -1)
         targets = targets.view(targets.size(0), -1)

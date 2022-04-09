@@ -1,7 +1,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-04-02 09:42:38
-LastEditTime: 2022-04-09 23:32:43
+LastEditTime: 2022-04-09 23:47:06
 Description: 
 
 '''
@@ -98,9 +98,9 @@ class MultiTaskDicomDataset (Dataset):
 
         if self.mask_list is not None:
             mask = torch.FloatTensor(mask)
+            return img, np.array(tag_score), study_primary_id, state, file_path, mask
         else:
-            mask = None
-        return img, np.array(tag_score), study_primary_id, state, file_path, mask
+            return img, np.array(tag_score), study_primary_id, state, file_path
 
     def __len__(self):
         return len(self.dicom_list)
