@@ -55,9 +55,9 @@ def main(config_file):
     testset = dataset.__dict__[data_config['type']](
         data_config['test_list'], data_config['test_meta'], transform_test, prefix=data_config['prefix'])
     trainloader = data.DataLoader(
-        trainset, batch_size=common_config['train_batch'], shuffle=True, num_workers=1)
+        trainset, batch_size=common_config['train_batch'], shuffle=True, num_workers=5)
     testloader = data.DataLoader(
-        testset, batch_size=common_config['train_batch'], shuffle=False, num_workers=1)
+        testset, batch_size=common_config['train_batch'], shuffle=False, num_workers=5)
 
 
     # Model

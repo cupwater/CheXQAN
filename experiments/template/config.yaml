@@ -24,7 +24,7 @@ loss_config:
 dataset : 
     crop_size : 512
     img_size : 512
-    num_classes: 19
+    num_classes: 13
     type: MultiTaskDataset
     
     train_list: 'data/train_list.txt'
