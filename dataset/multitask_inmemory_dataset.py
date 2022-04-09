@@ -36,12 +36,11 @@ class MultiTaskInMemoryDataset (Dataset):
         mask_data_list = []
         for index in range(len(self.imgs_list)):
             img_path = os.path.join(self.prefix, self.imgs_list[index].strip())
-            img = cv2.imread(img_path)
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
             img_data_list.append(img)
             if self.mask_list is not None:
                 mask_path = os.path.join(self.prefix, self.mask_list[index].strip())
-                mask_data_list.append(cv2.imread(mask_path))
+                mask_data_list.append(cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE))
         return img_data_list, mask_data_list
 
     def __getitem__(self, index):
