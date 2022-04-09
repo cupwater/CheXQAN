@@ -1,7 +1,7 @@
 '''
 Author: Baoyun Peng
 Date: 2022-03-21 22:24:38
-LastEditTime: 2022-04-08 14:15:31
+LastEditTime: 2022-04-09 23:33:53
 Description: incremental inference new Chest X-ray images and write the results into database
 
 '''
@@ -114,7 +114,7 @@ def inference(model, processed_path='logs/succeed.txt', failed_path='logs/failed
     states = []
     file_paths = []
 
-    for _, (inputs, tag_scores, ids, state, file_path) in enumerate(testloader):
+    for _, (inputs, tag_scores, ids, state, file_path, _) in enumerate(testloader):
         if use_cuda:
             #inputs, tag_scores = inputs.cuda(), tag_scores.cuda()
             inputs = inputs.cuda()

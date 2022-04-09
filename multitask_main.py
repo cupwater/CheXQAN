@@ -36,12 +36,11 @@ def main(config_file):
     with open(config_file) as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
     common_config = config['common']
-    
+
     state['lr'] = common_config['lr']
     if not os.path.isdir(common_config['save_path']):
         mkdir_p(common_config['save_path'])
     use_cuda = torch.cuda.is_available()
-
 
     data_config = config['dataset']
     # Dataset and Dataloader
@@ -50,19 +49,29 @@ def main(config_file):
     transform_test = XrayTestTransform(
         crop_size=data_config['crop_size'], img_size=data_config['img_size'])
     print('==> Preparing dataset %s' % data_config['type'])
+
+    # get mask_list from config
+    train_mask = data_config['train_mask'] if 'mask' in data_config else None
+    test_mask = data_config['test_mask'] if 'mask' in data_config else None
+
+    # create dataset for training and testing
     trainset = dataset.__dict__[data_config['type']](
-        data_config['train_list'], data_config['train_meta'], transform_train, prefix=data_config['prefix'])
+        data_config['train_list'], data_config['train_meta'], transform_train,
+        mask_list=train_mask, prefix=data_config['prefix'])
     testset = dataset.__dict__[data_config['type']](
-        data_config['test_list'], data_config['test_meta'], transform_test, prefix=data_config['prefix'])
+        data_config['test_list'], data_config['test_meta'], transform_test,
+        mask_list=test_mask, prefix=data_config['prefix'])
+
+    # create dataloader for training and testing
     trainloader = data.DataLoader(
         trainset, batch_size=common_config['train_batch'], shuffle=True, num_workers=5)
     testloader = data.DataLoader(
         testset, batch_size=common_config['train_batch'], shuffle=False, num_workers=5)
 
-
     # Model
     print("==> creating model '{}'".format(common_config['arch']))
-    model = models.__dict__[common_config['arch']](num_classes=data_config['num_classes'])
+    model = models.__dict__[common_config['arch']](
+        num_classes=data_config['num_classes'])
     model.classifier = nn.Sequential(
         nn.Linear(model.classifier.in_features, data_config['num_classes']), nn.Sigmoid())
     model.load_state_dict(torch.load(common_config['pretrained_weights'])[
@@ -82,8 +91,10 @@ def main(config_file):
         weight_decay=common_config['weight_decay'])
 
     # logger
-    title = 'Chest X-ray Image Quality Assessment using ' + common_config['arch']
-    logger = Logger(os.path.join(common_config['save_path'], 'log.txt'), title=title)
+    title = 'Chest X-ray Image Quality Assessment using ' + \
+        common_config['arch']
+    logger = Logger(os.path.join(
+        common_config['save_path'], 'log.txt'), title=title)
     logger.set_names(['Learning Rate', 'Train Loss',
                      'Valid Loss', 'Train Acc.', 'Valid Acc.'])
 
@@ -125,16 +136,19 @@ def train(trainloader, model, criterion, optimizer, use_cuda):
     top5 = AverageMeter()
     end = time.time()
 
-    for batch_idx, (inputs, targets) in enumerate(trainloader):
+    for batch_idx, (inputs, mask, targets) in enumerate(trainloader):
         # measure data loading time
         data_time.update(time.time() - end)
-
+        
         if use_cuda:
             inputs, targets = inputs.cuda(), targets.cuda()
-        inputs, targets = torch.autograd.Variable(
-            inputs), torch.autograd.Variable(targets)
+        inputs = torch.autograd.Variable(inputs)
+        targets = torch.autograd.Variable(targets)
+        if mask:
+            mask = mask.cuda()
+            mask = torch.autograd.Variable(mask)
+        
         outputs = model(inputs)
-
         outputs = outputs.view(outputs.size(0), -1)
         targets = targets.view(targets.size(0), -1)
 
